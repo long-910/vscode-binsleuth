@@ -101,6 +101,8 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (msg) => {
       if (msg.command === 'jumpToOffset') {
         await this._jumpToOffset(msg.file as string, msg.offset as number);
+      } else if (msg.command === 'openFile') {
+        await this._openFile(msg.file as string);
       }
     });
   }
@@ -149,6 +151,15 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
 
   private _postError(message: string): void {
     this._view?.webview.postMessage({ command: 'error', message });
+  }
+
+  private async _openFile(filePath: string): Promise<void> {
+    const uri = vscode.Uri.file(filePath);
+    try {
+      await vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit');
+    } catch {
+      await vscode.commands.executeCommand('vscode.open', uri);
+    }
   }
 
   private async _jumpToOffset(filePath: string, offset: number): Promise<void> {
@@ -262,6 +273,28 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
       gap: 8px;
       margin-bottom: 4px;
     }
+    .spacer { flex: 1; }
+    #btn-open {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      background: transparent;
+      border: 1px solid var(--cyan);
+      border-radius: 3px;
+      color: var(--cyan);
+      font-family: var(--font);
+      font-size: 9px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    #btn-open:hover {
+      background: rgba(0,212,255,0.12);
+      box-shadow: 0 0 8px var(--cyan);
+    }
+    #btn-open.visible { display: flex; }
     .logo-text {
       font-size: 13px;
       font-weight: bold;
@@ -480,6 +513,8 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
   <div class="logo-row">
     <div class="status-dot" id="status-dot"></div>
     <span class="logo-text">BINSLEUTH</span>
+    <div class="spacer"></div>
+    <button id="btn-open" title="Open file in editor">&#x25B6; OPEN</button>
   </div>
   <div id="filename">— NO FILE LOADED —</div>
   <div id="score-row">
@@ -970,6 +1005,13 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     val.style.textShadow = \`0 0 6px \${color}\`;
   }
 
+  // ── Open button ────────────────────────────────────────────────────────────
+  document.getElementById('btn-open').addEventListener('click', () => {
+    if (currentData) {
+      vscode.postMessage({ command: 'openFile', file: currentData.file });
+    }
+  });
+
   // ── Main data handler ──────────────────────────────────────────────────────
   function handleData(data) {
     currentData = data;
@@ -978,6 +1020,9 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     document.getElementById('empty-state').style.display = 'none';
     document.getElementById('error-state').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
+
+    // Show Open button now that we have a file
+    document.getElementById('btn-open').classList.add('visible');
 
     // Header
     const name = data.file.replace(/\\\\/g, '/').split('/').pop();
