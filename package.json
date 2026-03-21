@@ -1,0 +1,71 @@
+{
+  "name": "vscode-binsleuth",
+  "displayName": "BinSleuth",
+  "description": "Cyberpunk binary analysis visualizer — section map, entropy heatmap, security flags",
+  "version": "0.1.0",
+  "publisher": "long-910",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["binary", "elf", "pe", "security", "entropy", "analysis"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "binsleuth-sidebar",
+          "title": "BinSleuth",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "binsleuth-sidebar": [
+        {
+          "type": "webview",
+          "id": "binsleuth.analysisView",
+          "name": "Analysis"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "binsleuth.analyzeFile",
+        "title": "BinSleuth: Analyze Binary",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "binsleuth.analyzeActiveFile",
+        "title": "BinSleuth: Analyze Active File"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "binsleuth.analyzeFile",
+          "when": "resourceExtname =~ /\\.(elf|exe|dll|so|bin|o|a|dylib)$/i",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "binsleuth.analyzeActiveFile",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build:rust": "cd src-rust && cargo build --release",
+    "build:rust:debug": "cd src-rust && cargo build",
+    "build": "npm run build:rust && npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

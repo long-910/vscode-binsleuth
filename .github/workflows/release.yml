@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  # ── Build bridge + package VSIX for each platform ──────────────────────────
+  build:
+    name: Build (${{ matrix.vsce_target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            vsce_target: linux-x64
+            bin_name: binsleuth-bridge
+
+          - os: macos-latest
+            rust_target: aarch64-apple-darwin
+            vsce_target: darwin-arm64
+            bin_name: binsleuth-bridge
+
+          - os: macos-13
+            rust_target: x86_64-apple-darwin
+            vsce_target: darwin-x64
+            bin_name: binsleuth-bridge
+
+          - os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            vsce_target: win32-x64
+            bin_name: binsleuth-bridge.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-rust
+
+      - name: Build Rust bridge
+        run: cargo build --release --target ${{ matrix.rust_target }}
+        working-directory: src-rust
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Stage bridge binary
+        shell: bash
+        run: |
+          mkdir -p bin
+          cp src-rust/target/${{ matrix.rust_target }}/release/${{ matrix.bin_name }} bin/
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package VSIX
+        run: vsce package --target ${{ matrix.vsce_target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.vsce_target }}
+          path: "*.vsix"
+          retention-days: 7
+
+  # ── GitHub Release ──────────────────────────────────────────────────────────
+  release:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: vsix-artifacts
+          pattern: vsix-*
+          merge-multiple: true
+
+      - name: Extract release notes from CHANGELOG.md
+        id: changelog
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES=$(awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md 2>/dev/null || echo "")
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: vsix-artifacts/*.vsix
+          body: ${{ steps.changelog.outputs.notes }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Marketplace publish — uncomment when ready
+      # - name: Publish to VS Marketplace
+      #   uses: HaaLeo/publish-vscode-extension@v2
+      #   strategy:
+      #     matrix:
+      #       vsce_target: [linux-x64, darwin-arm64, darwin-x64, win32-x64]
+      #   with:
+      #     pat: ${{ secrets.VSCE_PAT }}
+      #     registryUrl: https://marketplace.visualstudio.com
+      #     packagePath: vsix-artifacts/vscode-binsleuth-*-${{ matrix.vsce_target }}.vsix

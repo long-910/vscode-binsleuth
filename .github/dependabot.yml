@@ -1,0 +1,124 @@
+version: 2
+
+updates:
+  # ================================
+  # 📦 npm (VS Code Extension)
+  # ================================
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Tokyo"
+
+    open-pull-requests-limit: 5
+    versioning-strategy: auto
+
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+    labels:
+      - "dependencies"
+      - "npm"
+
+    reviewers:
+      - "long-910"
+
+    assignees:
+      - "long-910"
+
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+      major:
+        update-types:
+          - "major"
+
+    ignore:
+      # VS Code API — managed manually to match engines.vscode
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-major"]
+      # Node.js types — managed manually to match VS Code's bundled Node
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  # ================================
+  # 🦀 Cargo (Rust bridge)
+  # ================================
+  - package-ecosystem: "cargo"
+    directory: "/src-rust"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Tokyo"
+
+    open-pull-requests-limit: 5
+
+    commit-message:
+      prefix: "deps(rust)"
+      include: "scope"
+
+    labels:
+      - "dependencies"
+      - "rust"
+
+    reviewers:
+      - "long-910"
+
+    assignees:
+      - "long-910"
+
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+      major:
+        update-types:
+          - "major"
+
+    ignore:
+      # binsleuth — managed manually (tracks upstream library releases)
+      - dependency-name: "binsleuth"
+        update-types: ["version-update:semver-major"]
+
+  # ================================
+  # ⚙ GitHub Actions
+  # ================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Tokyo"
+
+    open-pull-requests-limit: 3
+
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+    reviewers:
+      - "long-910"
+
+    assignees:
+      - "long-910"
+
+    groups:
+      actions-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+      actions-major:
+        update-types:
+          - "major"

@@ -1,0 +1,14 @@
+.vscode/**
+.vscode-test/**
+src/**
+src-rust/**
+out/test/**
+node_modules/**
+.gitignore
+.yarnrc
+webpack.config.js
+vsc-extension-quickstart.md
+**/tsconfig.json
+**/*.map
+**/*.ts
+docs/**
