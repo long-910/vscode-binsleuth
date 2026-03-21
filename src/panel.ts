@@ -632,7 +632,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
   </div>
 
   <!-- Entropy Heatmap -->
-  <div class="panel" style="border-bottom:none;">
+  <div class="panel">
     <div class="panel-title" style="display:flex;align-items:center;gap:6px;">
       Entropy Heatmap
       <select id="entropy-sort" title="Sort order">
@@ -646,6 +646,24 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="chart-wrap">
       <canvas id="entropyChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Size Heatmap -->
+  <div class="panel" style="border-bottom:none;">
+    <div class="panel-title" style="display:flex;align-items:center;gap:6px;">
+      Size Heatmap
+      <select id="size-sort" title="Sort order">
+        <option value="offset">OFFSET ↑</option>
+        <option value="size_desc">SIZE ↓</option>
+        <option value="size_asc">SIZE ↑</option>
+        <option value="entropy_desc">ENTROPY ↓</option>
+        <option value="entropy_asc">ENTROPY ↑</option>
+        <option value="name">NAME A-Z</option>
+      </select>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="sizeChart"></canvas>
     </div>
   </div>
 
@@ -760,7 +778,8 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
   // ── Chart instances ────────────────────────────────────────────────────────
   let sectionChart = null;
   let entropyChart = null;
-  let currentData = null;
+  let sizeChart    = null;
+  let currentData  = null;
 
   // ── Chart.js global defaults (cyberpunk theme) ─────────────────────────────
   function initChartDefaults() {
@@ -1025,6 +1044,105 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  // ── Size Heatmap (horizontal bar chart) ────────────────────────────────────
+  function buildSizeChart(sections) {
+    const ctx = document.getElementById('sizeChart').getContext('2d');
+
+    const sortKey = document.getElementById('size-sort').value;
+    const sorted  = [...sections].sort(SORT_FN[sortKey] ?? SORT_FN.offset);
+    const maxSize = Math.max(...sorted.map(s => s.size), 1);
+
+    const labels       = sorted.map(s => s.name);
+    const sizes        = sorted.map(s => s.size);
+    const bgColors     = sizes.map(s => entropyToColor((s / maxSize) * 8) + 'cc');
+    const borderColors = sizes.map(s => entropyToColor((s / maxSize) * 8));
+
+    const barHeight   = 22;
+    const canvasHeight = Math.max(80, sorted.length * barHeight + 40);
+    document.getElementById('sizeChart').style.height = canvasHeight + 'px';
+    document.getElementById('sizeChart').height = canvasHeight;
+
+    if (sizeChart) { sizeChart.destroy(); }
+
+    sizeChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Size',
+          data: sizes,
+          backgroundColor: bgColors,
+          borderColor: borderColors,
+          borderWidth: 1,
+          borderRadius: 2,
+          hoverBackgroundColor: borderColors,
+          barThickness: barHeight - 4,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+          duration: 900,
+          easing: 'easeOutQuart',
+          delay: (ctx) => ctx.dataIndex * 40,
+        },
+        scales: {
+          x: {
+            min: 0,
+            grid: { color: '#1a3a5c66' },
+            ticks: {
+              color: '#4a6a8a',
+              callback: (v) => fmtBytes(v),
+              maxTicksLimit: 6,
+            },
+            border: { color: '#1a3a5c' },
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: '#8899bb', font: { size: 9 } },
+            border: { color: '#1a3a5c' },
+          },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0d1420ee',
+            borderColor: '#1a3a5c',
+            borderWidth: 1,
+            titleColor: '#00d4ff',
+            bodyColor: '#c0d8f0',
+            callbacks: {
+              title: (items) => items[0].label,
+              label: (item) => {
+                const sec = sorted[item.dataIndex];
+                const pct = ((sec.size / maxSize) * 100).toFixed(1);
+                return [
+                  \`  Size    \${fmtBytes(sec.size)} (\${pct}%)\`,
+                  \`  Offset  \${fmtHex(sec.file_offset)}\`,
+                  \`  Entropy \${sec.entropy.toFixed(3)} bits\`,
+                ];
+              },
+            },
+          },
+        },
+        onClick: (evt, elements) => {
+          if (!elements.length) return;
+          const sec = sorted[elements[0].index];
+          vscode.postMessage({
+            command: 'jumpToOffset',
+            file: currentData.file,
+            offset: sec.file_offset,
+          });
+        },
+        onHover: (evt, elements) => {
+          evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+        },
+      },
+    });
+  }
+
   // ── UI update helpers ──────────────────────────────────────────────────────
   function renderSecurityFlags(security) {
     const FLAGS = [
@@ -1083,9 +1201,12 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     val.style.textShadow = \`0 0 6px \${color}\`;
   }
 
-  // ── Entropy sort selector ──────────────────────────────────────────────────
+  // ── Sort selectors ─────────────────────────────────────────────────────────
   document.getElementById('entropy-sort').addEventListener('change', () => {
     if (currentData) { buildEntropyChart(currentData.sections); }
+  });
+  document.getElementById('size-sort').addEventListener('change', () => {
+    if (currentData) { buildSizeChart(currentData.sections); }
   });
 
   // ── Open button ────────────────────────────────────────────────────────────
@@ -1127,6 +1248,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     setTimeout(() => {
       buildSectionChart(data.sections);
       buildEntropyChart(data.sections);
+      buildSizeChart(data.sections);
     }, 50);
   }
 
