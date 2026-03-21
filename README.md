@@ -1,6 +1,6 @@
 # vscode-binsleuth
 
-> Cyberpunk binary analysis — section map, entropy heatmap, and security flags right inside VS Code.
+> Cyberpunk binary analysis — section map, section heatmap, and security flags right inside VS Code.
 
 <div align="center">
 
@@ -13,26 +13,46 @@
 
 </div>
 
-## Overview
+---
 
-**vscode-binsleuth** is a Visual Studio Code extension that visualizes the internals of ELF / PE binaries without leaving your editor.
+## Quick Start
 
-It uses a Rust-based analysis bridge powered by the [`binsleuth`](https://crates.io/crates/binsleuth) crate.
-The bridge runs as a subprocess, analyzes the target binary, and streams a JSON report back to the extension.
-A cyberpunk-themed Webview sidebar then renders the results with [Chart.js](https://www.chartjs.org/).
+**1. Build the Rust bridge** (one-time, requires Rust 1.85+)
 
-```
-Binary file  ──►  binsleuth-bridge (Rust)  ──►  JSON  ──►  Webview (Chart.js)
-                  sections · entropy               ▲         Section Map
-                  security flags                   │         Entropy Heatmap
-                  dangerous symbols                │         Security Flags
-                                              click → jump to offset
+```bash
+git clone https://github.com/long-910/vscode-binsleuth.git
+cd vscode-binsleuth
+npm install
+npm run build:rust      # compiles src-rust/ → bin/binsleuth-bridge
+npm run compile         # compiles TypeScript
 ```
 
-> [!NOTE]
-> The Rust bridge binary must be compiled once before first use.
-> Run `npm run build:rust` in the project root.
-> After that, the extension automatically locates the binary and works offline — no network calls, no telemetry.
+**2. Open the Extension Development Host**
+
+Press **F5** in VS Code.
+A new window opens with the extension active.
+
+**3. Analyze a binary**
+
+Open any `.elf`, `.exe`, `.dll`, `.so`, `.bin`, `.o`, `.a`, `.dylib`, or `.out` file —
+the BinSleuth sidebar updates automatically.
+
+> **Tip:** Click the crosshair icon (⊕) in the Activity Bar to open the BinSleuth panel at any time.
+
+---
+
+## What It Shows
+
+```
+Binary file  ──►  binsleuth-bridge (Rust)  ──►  JSON  ──►  Webview sidebar
+                  · section info                           · Section Map
+                  · Shannon entropy                        · Section Heatmap
+                  · security flags                         · Security Score
+                  · dangerous symbols                      · Dangerous Symbols
+                                                      click any chart → jump to offset
+```
+
+The Rust bridge runs as a subprocess — **no network calls, no telemetry**.
 
 ---
 
@@ -40,25 +60,40 @@ Binary file  ──►  binsleuth-bridge (Rust)  ──►  JSON  ──►  Web
 
 ### Section Map
 
-A doughnut chart showing how each section contributes to the overall binary size.
+A doughnut chart that shows how each section contributes to the binary's on-disk size.
 
 - Neon-coloured arcs keyed by section type (`.text` green, `.data` cyan, `.bss` purple, …)
-- Centre label shows total on-disk size and section count
-- Hover tooltip: name, size, file offset, entropy, permissions (`RWX`)
-- **Click any slice** → jumps to that section's file offset in the Hex Editor (falls back to a standard `vscode.open`)
+- Centre label: total file size and section count
+- Hover tooltip: name · size · file offset · entropy · permissions (`RWX`)
+- **Click any slice** → jumps to that section's offset in the Hex Editor (falls back to `vscode.open`)
 
-### Entropy Heatmap
+### Section Heatmap
 
-A horizontal bar chart with sections sorted by file offset.
+A horizontal bar chart that visualises **both size and entropy** of every section at once.
 
-- Each bar's colour encodes Shannon entropy on a cold–hot scale:
-  `blue (0) → cyan → green → orange → red (8)`
-- Sections with entropy > 7.0 are a strong indicator of packed or encrypted content
-- **Click any bar** → jumps to that section's offset
+| Visual element | What it encodes |
+|----------------|----------------|
+| Bar length | Section size (x-axis in bytes) |
+| Bar colour | Shannon entropy — cold blue (0 bits) → hot red (8 bits) |
+| Number on bar | Exact entropy value |
+| Neon glow | Entropy > 6.5 — likely packed or encrypted content |
+
+A gradient colour legend (0 – 8 bits) is drawn above the chart for reference.
+
+**Sort selector** (top-right of the panel):
+
+| Option | Order |
+|--------|-------|
+| OFFSET ↑ | File offset, ascending (default) |
+| SIZE ↓ / SIZE ↑ | Largest / smallest section first |
+| ENTROPY ↓ / ENTROPY ↑ | Highest / lowest entropy first |
+| NAME A-Z | Alphabetical |
+
+**Click any bar** → jumps to that section's file offset.
 
 ### Security Flags Panel
 
-At-a-glance badges for all hardening properties detected by `binsleuth`:
+At-a-glance hardening badges:
 
 | Badge | Meaning |
 |-------|---------|
@@ -69,71 +104,79 @@ At-a-glance badges for all hardening properties detected by `binsleuth`:
 | `FORTIFY` | FORTIFY_SOURCE |
 | `STRIP` | Debug symbols stripped |
 
-Colour coding: green = Enabled, orange = Partial, red = Disabled, grey = N/A.
+Colour coding: **green** = Enabled · **orange** = Partial · **red** = Disabled · **grey** = N/A
+
+A **Security Score** (0–100) is shown in the header — higher is better.
 
 ### Dangerous Symbol Detection
 
 If the binary imports symbols in high-risk categories (shell execution, network I/O, memory manipulation),
-they are listed below the security flags panel.
+they are listed with their category tag directly in the sidebar.
 
 ### Auto-Detection
 
-Opening a file with any of the following extensions automatically triggers analysis:
-
-`.elf` `.exe` `.dll` `.so` `.bin` `.o` `.a` `.dylib` `.out`
+Opening any file with a recognised binary extension triggers analysis automatically.
+No command needed.
 
 ---
 
-## Architecture
+## Usage
 
-| Layer | Language | Key dependencies |
-|-------|----------|-----------------|
-| Analysis bridge | Rust | [`binsleuth 0.4`](https://crates.io/crates/binsleuth), `serde_json`, `anyhow` |
-| Extension host | TypeScript | VS Code API (`^1.85`), `child_process` |
-| Webview UI | HTML / JS | [Chart.js 4.4](https://www.chartjs.org/) (CDN) |
+### Triggering Analysis
 
-The bridge binary is invoked via `child_process.execFile` with the target file path as the sole argument.
-It writes a single JSON object to stdout and exits:
+| How | When to use |
+|-----|-------------|
+| Open a binary file in the editor | Quickest — analysis starts automatically |
+| Right-click file in Explorer → **BinSleuth: Analyze Binary** | Analyze without opening the file |
+| **Ctrl+Shift+P** → **BinSleuth: Analyze Active File** | Re-analyze the currently focused file |
 
-```jsonc
-{
-  "file": "/path/to/binary",
-  "sections": [
-    {
-      "name": ".text",
-      "size": 98304,
-      "virtual_address": 4096,
-      "file_offset": 4096,
-      "entropy": 5.821,
-      "permissions": { "read": true, "write": false, "execute": true }
-    }
-    // …
-  ],
-  "security": {
-    "format": "ELF",
-    "architecture": "x86_64",
-    "nx": "Enabled",
-    "pie": "Enabled",
-    "relro": "Enabled",
-    "canary": "Enabled",
-    "fortify": "Disabled",
-    "rpath": "N/A",
-    "stripped": "Enabled",
-    "dangerous_symbols": []
-  },
-  "security_score": 100,
-  "total_virtual_size": 204800,
-  "total_file_size": 163840
-}
+### Header Buttons
+
+| Button | Action |
+|--------|--------|
+| **OPEN** | Open the analyzed binary in the Hex Editor (or default editor) |
+| **EXPORT ▾** | Save a report — choose **Markdown**, **JSON**, or **CSV** |
+
+### Navigating to a Section
+
+Click any slice in the Section Map **or** any bar in the Section Heatmap.
+If the [Hex Editor](https://marketplace.visualstudio.com/items?itemName=ms-vscode.hexeditor) extension is installed, the cursor jumps directly to the section's file offset.
+Otherwise VS Code opens the file with `vscode.open`.
+
+### Exporting a Report
+
+1. Click **EXPORT ▾** in the sidebar header.
+2. Choose the format: **Markdown** (human-readable), **JSON** (machine-readable), or **CSV** (spreadsheet).
+3. A save dialog opens — pick the destination and save.
+
+The report includes: binary metadata, per-section table (name · size · offset · entropy · permissions), security flags, and dangerous symbols.
+
+---
+
+## WSL / Windows Support
+
+### VS Code running inside WSL (Remote - WSL)
+
+Works out of the box.
+The bridge binary is a Linux ELF (`bin/binsleuth-bridge`) invoked directly.
+
+### VS Code running on Windows (native)
+
+The extension detects `process.platform === 'win32'` and calls the bridge via `wsl.exe`:
+
+```
+wsl.exe <wsl-path-to-bridge> <wsl-path-to-file>
 ```
 
----
+File paths are converted automatically:
 
-## Requirements
+| Input path | Converted to |
+|-----------|--------------|
+| `C:\Users\foo\bar.exe` | `/mnt/c/Users/foo/bar.exe` |
+| `//wsl.localhost/Ubuntu/home/foo/a.out` | `/home/foo/a.out` |
+| `/Ubuntu/home/foo/a.out` | `/home/foo/a.out` |
 
-- **VS Code** 1.85 or newer
-- **Rust toolchain** 1.85 or newer (for building the bridge)
-- **[Hex Editor](https://marketplace.visualstudio.com/items?itemName=ms-vscode.hexeditor)** *(optional)* — enables click-to-offset navigation inside the binary
+**Requirement:** WSL must be installed and `wsl.exe` must be on `%PATH%`.
 
 ---
 
@@ -145,50 +188,46 @@ It writes a single JSON object to stdout and exits:
 git clone https://github.com/long-910/vscode-binsleuth.git
 cd vscode-binsleuth
 npm install
-npm run build:rust      # compile the Rust bridge (one-time)
-npm run compile         # compile TypeScript
+npm run build:rust      # Rust bridge → bin/binsleuth-bridge (Linux/macOS)
+                        #             → bin/binsleuth-bridge.exe (Windows)
+npm run compile         # TypeScript → out/
 ```
 
-Then press **F5** in VS Code to launch an Extension Development Host.
+Press **F5** to launch an Extension Development Host.
 
-### Build a VSIX
+### Build a VSIX (install into any VS Code)
 
 ```bash
 npm install -g @vscode/vsce
 npm run build           # build:rust + compile
-vsce package            # → vscode-binsleuth-*.vsix
+vsce package            # → vscode-binsleuth-0.1.0.vsix
 ```
 
-Install the generated `.vsix`:
+Install the `.vsix`:
 **Extensions (Ctrl+Shift+X)** → **⋯** → **Install from VSIX…**
 
----
+### Requirements
 
-## Usage
-
-| Action | Result |
-|--------|--------|
-| Open a binary file (`.elf`, `.exe`, …) | Analysis runs automatically |
-| Right-click file in Explorer → **BinSleuth: Analyze Binary** | Analyze any file |
-| **Ctrl+Shift+P** → **BinSleuth: Analyze Active File** | Analyze the active editor |
-| Click a section in the Section Map | Jump to its offset + show detail card |
-| Click a bar in the Entropy Heatmap | Jump to that section's offset |
-
-The BinSleuth sidebar is accessible from the activity bar (targeting-reticle icon).
+| Dependency | Version | Notes |
+|-----------|---------|-------|
+| VS Code | ≥ 1.85 | |
+| Rust toolchain | ≥ 1.85 | Build only — not needed at runtime |
+| [Hex Editor](https://marketplace.visualstudio.com/items?itemName=ms-vscode.hexeditor) | any | Optional — enables click-to-offset navigation |
+| WSL (Windows only) | any | Required for native Windows VS Code |
 
 ---
 
 ## Development
 
 ```bash
-# Watch TypeScript
+# Watch TypeScript (auto-recompile on save)
 npm run watch
 
 # Rebuild Rust bridge after editing src-rust/
 npm run build:rust
 
-# Run Extension Development Host
-# → Press F5 in VS Code (uses .vscode/launch.json)
+# Launch Extension Development Host
+# → Press F5 in VS Code (config: .vscode/launch.json)
 ```
 
 Project structure:
@@ -196,17 +235,21 @@ Project structure:
 ```
 vscode-binsleuth/
 ├── src-rust/
-│   ├── Cargo.toml          # binsleuth + serde_json + anyhow
+│   ├── Cargo.toml          # binsleuth 0.4 + serde_json + anyhow
 │   └── src/main.rs         # CLI: reads binary → JSON stdout
 ├── src/
-│   ├── extension.ts        # activate(), commands, file watcher
-│   └── panel.ts            # WebviewViewProvider + full Webview HTML/JS
+│   ├── extension.ts        # activate(), commands, auto-detection, path normalization
+│   └── panel.ts            # WebviewViewProvider + Webview HTML/CSS/JS
+├── bin/                    # compiled bridge binary (git-ignored)
 ├── resources/
-│   └── icon.svg            # Activity bar icon
+│   └── icon.svg            # Activity Bar icon
 └── .vscode/
     ├── launch.json         # F5 debug config
-    └── tasks.json          # TypeScript build tasks
+    └── tasks.json          # TypeScript build task
 ```
+
+The bridge outputs a single JSON object to stdout and exits.
+The extension reads it via `child_process.execFile` and passes it to the Webview.
 
 ---
 
@@ -215,11 +258,14 @@ vscode-binsleuth/
 | Feature | Status |
 |---------|--------|
 | Section Map (doughnut chart) | ✅ v0.1.0 |
-| Entropy Heatmap (horizontal bar) | ✅ v0.1.0 |
-| Security flags panel (NX/PIE/RELRO/Canary/…) | ✅ v0.1.0 |
+| Section Heatmap (size + entropy, neon glow) | ✅ v0.1.0 |
+| Security flags panel (NX / PIE / RELRO / …) | ✅ v0.1.0 |
+| Security Score (0–100) | ✅ v0.1.0 |
 | Dangerous symbol detection | ✅ v0.1.0 |
 | Click-to-offset navigation | ✅ v0.1.0 |
-| Auto-analysis on binary file open | ✅ v0.1.0 |
+| Auto-analysis on binary open | ✅ v0.1.0 |
+| Export report (Markdown / JSON / CSV) | ✅ v0.1.0 |
+| WSL / Windows-native VS Code support | ✅ v0.1.0 |
 | VS Code Marketplace publication | 🔲 planned |
 | Configurable bridge binary path | 🔲 planned |
 | PE / Mach-O format badges | 🔲 planned |
@@ -229,8 +275,8 @@ vscode-binsleuth/
 
 ## Related Projects
 
-- [BinSleuth](https://github.com/long-910/BinSleuth) — the underlying Rust analysis library (same author)
-- [vscode-claude-status](https://github.com/long-910/vscode-claude-status) — Claude Code token usage in the VS Code status bar (same author)
+- [BinSleuth](https://github.com/long-910/BinSleuth) — the underlying Rust analysis library
+- [vscode-claude-status](https://github.com/long-910/vscode-claude-status) — Claude Code token usage in the VS Code status bar
 
 ---
 
