@@ -1,12 +1,35 @@
 {
   "name": "vscode-binsleuth",
   "displayName": "BinSleuth",
-  "description": "Cyberpunk binary analysis visualizer — section map, entropy heatmap, security flags",
+  "description": "Binary analysis visualizer — section map, entropy heatmap, security flags",
   "version": "0.1.0",
-  "publisher": "long-910",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
-  "keywords": ["binary", "elf", "pe", "security", "entropy", "analysis"],
+  "publisher": "long-kudo",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "binary",
+    "elf",
+    "pe",
+    "security",
+    "entropy",
+    "analysis"
+  ],
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/long-910/vscode-binsleuth"
+  },
+  "sponsor": {
+    "url": "https://github.com/sponsors/long-910"
+  },
+  "bugs": {
+    "url": "https://github.com/long-910/vscode-binsleuth/issues"
+  },
+  "license": "MIT",
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
