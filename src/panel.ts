@@ -459,6 +459,26 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     #dangerous-list div { padding: 1px 0; }
     .sym-cat { color: var(--red); margin-right: 4px; }
 
+    /* ── Sort select ─────────────────────────────────────────────────── */
+    #entropy-sort {
+      margin-left: auto;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--cyan);
+      font-family: var(--font);
+      font-size: 9px;
+      letter-spacing: 1px;
+      padding: 2px 6px;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    #entropy-sort:hover, #entropy-sort:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan);
+    }
+
     /* ── Chart containers ────────────────────────────────────────────── */
     .chart-wrap {
       position: relative;
@@ -613,8 +633,16 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
 
   <!-- Entropy Heatmap -->
   <div class="panel" style="border-bottom:none;">
-    <div class="panel-title">Entropy Heatmap
-      <span style="color:var(--text-dim);font-size:8px;margin-left:6px;letter-spacing:0;">(sorted by file offset)</span>
+    <div class="panel-title" style="display:flex;align-items:center;gap:6px;">
+      Entropy Heatmap
+      <select id="entropy-sort" title="Sort order">
+        <option value="offset">OFFSET ↑</option>
+        <option value="size_desc">SIZE ↓</option>
+        <option value="size_asc">SIZE ↑</option>
+        <option value="entropy_desc">ENTROPY ↓</option>
+        <option value="entropy_asc">ENTROPY ↑</option>
+        <option value="name">NAME A-Z</option>
+      </select>
     </div>
     <div class="chart-wrap">
       <canvas id="entropyChart"></canvas>
@@ -882,11 +910,20 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
   }
 
   // ── Entropy Heatmap (horizontal bar chart) ─────────────────────────────────
+  const SORT_FN = {
+    offset:       (a, b) => a.file_offset - b.file_offset,
+    size_desc:    (a, b) => b.size - a.size,
+    size_asc:     (a, b) => a.size - b.size,
+    entropy_desc: (a, b) => b.entropy - a.entropy,
+    entropy_asc:  (a, b) => a.entropy - b.entropy,
+    name:         (a, b) => a.name.localeCompare(b.name),
+  };
+
   function buildEntropyChart(sections) {
     const ctx = document.getElementById('entropyChart').getContext('2d');
 
-    // Sort by file offset ascending
-    const sorted = [...sections].sort((a, b) => a.file_offset - b.file_offset);
+    const sortKey = document.getElementById('entropy-sort').value;
+    const sorted = [...sections].sort(SORT_FN[sortKey] ?? SORT_FN.offset);
     const labels = sorted.map(s => s.name);
     const entropies = sorted.map(s => s.entropy);
     const bgColors = entropies.map(e => entropyToColor(e) + 'cc');
@@ -1045,6 +1082,11 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     val.style.color = color;
     val.style.textShadow = \`0 0 6px \${color}\`;
   }
+
+  // ── Entropy sort selector ──────────────────────────────────────────────────
+  document.getElementById('entropy-sort').addEventListener('change', () => {
+    if (currentData) { buildEntropyChart(currentData.sections); }
+  });
 
   // ── Open button ────────────────────────────────────────────────────────────
   document.getElementById('btn-open').addEventListener('click', () => {
