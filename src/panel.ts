@@ -59,11 +59,26 @@ function getNonce(): string {
   return result;
 }
 
+/**
+ * Windows パス → WSL パスに変換する。
+ * 例: "C:\Users\foo\bar"  →  "/mnt/c/Users/foo/bar"
+ * 既に Unix スタイルのパスはそのまま返す。
+ */
+function toWslPath(winPath: string): string {
+  const m = winPath.match(/^([a-zA-Z]):[/\\](.*)/s);
+  if (m) {
+    return `/mnt/${m[1].toLowerCase()}/${m[2].replace(/\\/g, '/')}`;
+  }
+  return winPath;
+}
+
+/**
+ * ブリッジバイナリを探す。
+ * バイナリは常に Linux ELF（.exe なし）。Windows でも同名で存在し wsl.exe 経由で実行する。
+ */
 function findBridgeBinary(extensionUri: vscode.Uri): string | undefined {
-  const isWin = process.platform === 'win32';
-  const exe = isWin ? '.exe' : '';
-  const name = `binsleuth-bridge${exe}`;
   const base = extensionUri.fsPath;
+  const name = 'binsleuth-bridge';
 
   const candidates = [
     path.join(base, 'bin', name),
@@ -124,9 +139,21 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
 
     this._postStatus('analyzing', path.basename(filePath));
 
+    // Windows ネイティブ VS Code では Rust ブリッジ（Linux ELF）を
+    // wsl.exe 経由で実行し、パスも WSL 形式に変換して渡す。
+    let cmd: string;
+    let args: string[];
+    if (process.platform === 'win32') {
+      cmd = 'wsl.exe';
+      args = [toWslPath(bridge), toWslPath(filePath)];
+    } else {
+      cmd = bridge;
+      args = [filePath];
+    }
+
     cp.execFile(
-      bridge,
-      [filePath],
+      cmd,
+      args,
       { maxBuffer: 8 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
@@ -153,8 +180,22 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ command: 'error', message });
   }
 
+  /** WSL パスから VS Code が開ける URI を構築する。 */
+  private _fileUri(filePath: string): vscode.Uri {
+    if (process.platform === 'win32') {
+      // /mnt/c/... はそのまま Windows パスに戻して file:// にする
+      const mnt = filePath.match(/^\/mnt\/([a-z])\/(.*)/s);
+      if (mnt) {
+        return vscode.Uri.file(`${mnt[1].toUpperCase()}:\\${mnt[2].replace(/\//g, '\\')}`);
+      }
+      // /home/... など WSL 内のパスは vscode-remote URI で開く
+      return vscode.Uri.from({ scheme: 'vscode-remote', authority: 'wsl+Ubuntu', path: filePath });
+    }
+    return vscode.Uri.file(filePath);
+  }
+
   private async _openFile(filePath: string): Promise<void> {
-    const uri = vscode.Uri.file(filePath);
+    const uri = this._fileUri(filePath);
     try {
       await vscode.commands.executeCommand('vscode.openWith', uri, 'hexEditor.hexedit');
     } catch {
@@ -163,7 +204,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async _jumpToOffset(filePath: string, offset: number): Promise<void> {
-    const uri = vscode.Uri.file(filePath);
+    const uri = this._fileUri(filePath);
     const hexStr = `0x${offset.toString(16).toUpperCase().padStart(8, '0')}`;
 
     // Try to open with the Hex Editor extension if available
