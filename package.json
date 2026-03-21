@@ -47,7 +47,8 @@
         {
           "type": "webview",
           "id": "binsleuth.analysisView",
-          "name": "Analysis"
+          "name": "Analysis",
+          "icon": "resources/icon.svg"
         }
       ]
     },
