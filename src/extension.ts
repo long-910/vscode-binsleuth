@@ -9,27 +9,49 @@ const BINARY_EXTS = new Set([
 /**
  * URI → Linux (WSL) ブリッジが読めるファイルパスに変換する。
  *
- * ケース①: vscode-remote (WSL) URI
- *   uri.fsPath = "/Ubuntu/home/..."  ← ディストロ名プレフィックスが入る
+ * ケース①: vscode-remote (WSL/SSH) URI
+ *   uri.fsPath = "/Ubuntu/home/..."  ← ディストロ名プレフィックスが入る場合がある
  *   uri.path   = "/home/..."         ← 正規パス → こちらを使う
  *
- * ケース②: Windows ドライブレターパス (c:/... や C:\...)
+ * ケース②: file:// URI でも WSL ディストロ名プレフィックスが付く場合
+ *   fsPath = "/Ubuntu/home/..."  →  "/home/..."
+ *   (VS Code が file:// スキームのまま /<distro>/... 形式を返すことがある)
+ *
+ * ケース③: WSL UNC パス (Windows ホスト側から見たパス)
+ *   fsPath = "//wsl.localhost/Ubuntu/home/..."  →  "/home/..."
+ *
+ * ケース④: Windows ドライブレターパス (c:/... や C:\...)
  *   WSL では Windows ドライブは /mnt/<drive>/ にマウントされているため変換する
- *   例: "c:/Users/foo/bar" → "/mnt/c/Users/foo/bar"
+ *   例: "c:/Users/foo/bar"  →  "/mnt/c/Users/foo/bar"
  */
 function toLocalPath(uri: vscode.Uri): string {
+  // ケース①: vscode-remote スキームは uri.path が正規パス
   if (uri.scheme === 'vscode-remote') {
     return uri.path;
   }
 
   const p = uri.fsPath;
 
-  // Windows drive letter: "C:\..." or "c:/..."  →  "/mnt/c/..."
+  // ケース④: Windows ドライブレター "C:\..." or "c:/..."  →  "/mnt/c/..."
   const winDrive = p.match(/^([a-zA-Z]):[/\\](.*)/s);
   if (winDrive) {
     const drive = winDrive[1].toLowerCase();
     const rest  = winDrive[2].replace(/\\/g, '/');
     return `/mnt/${drive}/${rest}`;
+  }
+
+  // ケース③: WSL UNC "//wsl.localhost/Ubuntu/home/..."  →  "/home/..."
+  const wslUnc = p.match(/^\/\/wsl[^/]*\/[^/]+(\/.*)/);
+  if (wslUnc) {
+    return wslUnc[1];
+  }
+
+  // ケース②: "/<DistroName>/<linux-root>/..."  →  "/<linux-root>/..."
+  // 標準 Linux ルートディレクトリのいずれかで始まる第2コンポーネントを検出する
+  const LINUX_ROOTS = /^\/(home|usr|opt|mnt|tmp|var|etc|bin|lib|run|srv|sys|proc|dev|root|boot)\b/;
+  const distroPrefix = p.match(/^\/[^/]+(\/.*)/);
+  if (distroPrefix && LINUX_ROOTS.test(distroPrefix[1])) {
+    return distroPrefix[1];
   }
 
   return p;
