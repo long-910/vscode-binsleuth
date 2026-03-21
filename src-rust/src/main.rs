@@ -101,7 +101,7 @@ fn main() -> Result<()> {
     // Sections with file_offset == 0 and non-zero name like .bss may have no disk bytes
     let total_file_size: u64 = sections
         .iter()
-        .filter(|s| !(s.file_offset == 0 && s.name != ".text" && s.name != ""))
+        .filter(|s| !(s.file_offset == 0 && s.name != ".text" && !s.name.is_empty()))
         .map(|s| s.size)
         .sum();
 

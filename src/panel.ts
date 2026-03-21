@@ -514,7 +514,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     .sym-cat { color: var(--red); margin-right: 4px; }
 
     /* ── Sort select ─────────────────────────────────────────────────── */
-    #entropy-sort {
+    #combined-sort {
       margin-left: auto;
       background: var(--bg3);
       border: 1px solid var(--border);
@@ -528,7 +528,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    #entropy-sort:hover, #entropy-sort:focus {
+    #combined-sort:hover, #combined-sort:focus {
       border-color: var(--cyan);
       box-shadow: 0 0 6px var(--cyan);
     }
@@ -693,29 +693,11 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     <div id="section-detail"></div>
   </div>
 
-  <!-- Entropy Heatmap -->
-  <div class="panel">
-    <div class="panel-title" style="display:flex;align-items:center;gap:6px;">
-      Entropy Heatmap
-      <select id="entropy-sort" title="Sort order">
-        <option value="offset">OFFSET ↑</option>
-        <option value="size_desc">SIZE ↓</option>
-        <option value="size_asc">SIZE ↑</option>
-        <option value="entropy_desc">ENTROPY ↓</option>
-        <option value="entropy_asc">ENTROPY ↑</option>
-        <option value="name">NAME A-Z</option>
-      </select>
-    </div>
-    <div class="chart-wrap">
-      <canvas id="entropyChart"></canvas>
-    </div>
-  </div>
-
-  <!-- Size Heatmap -->
+  <!-- Section Heatmap (size = bar length, entropy = bar color) -->
   <div class="panel" style="border-bottom:none;">
     <div class="panel-title" style="display:flex;align-items:center;gap:6px;">
-      Size Heatmap
-      <select id="size-sort" title="Sort order">
+      Section Heatmap
+      <select id="combined-sort" title="Sort order">
         <option value="offset">OFFSET ↑</option>
         <option value="size_desc">SIZE ↓</option>
         <option value="size_asc">SIZE ↑</option>
@@ -725,7 +707,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
       </select>
     </div>
     <div class="chart-wrap">
-      <canvas id="sizeChart"></canvas>
+      <canvas id="combinedChart"></canvas>
     </div>
   </div>
 
@@ -838,10 +820,9 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
   }
 
   // ── Chart instances ────────────────────────────────────────────────────────
-  let sectionChart = null;
-  let entropyChart = null;
-  let sizeChart    = null;
-  let currentData  = null;
+  let sectionChart  = null;
+  let combinedChart = null;
+  let currentData   = null;
 
   // ── Chart.js global defaults (cyberpunk theme) ─────────────────────────────
   function initChartDefaults() {
@@ -1000,134 +981,131 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     name:         (a, b) => a.name.localeCompare(b.name),
   };
 
-  function buildEntropyChart(sections) {
-    const ctx = document.getElementById('entropyChart').getContext('2d');
+  // ── Section Heatmap: bar length = size, bar color = entropy ───────────────
+  function buildCombinedHeatmap(sections) {
+    const canvas = document.getElementById('combinedChart');
+    const ctx = canvas.getContext('2d');
 
-    const sortKey = document.getElementById('entropy-sort').value;
-    const sorted = [...sections].sort(SORT_FN[sortKey] ?? SORT_FN.offset);
-    const labels = sorted.map(s => s.name);
-    const entropies = sorted.map(s => s.entropy);
-    const bgColors = entropies.map(e => entropyToColor(e) + 'cc');
-    const borderColors = entropies.map(e => entropyToColor(e));
-
-    const barHeight = 22;
-    const canvasHeight = Math.max(80, sorted.length * barHeight + 40);
-    document.getElementById('entropyChart').style.height = canvasHeight + 'px';
-    document.getElementById('entropyChart').height = canvasHeight;
-
-    if (entropyChart) { entropyChart.destroy(); }
-
-    entropyChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Entropy',
-          data: entropies,
-          backgroundColor: bgColors,
-          borderColor: borderColors,
-          borderWidth: 1,
-          borderRadius: 2,
-          hoverBackgroundColor: borderColors,
-          barThickness: barHeight - 4,
-        }],
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: {
-          duration: 900,
-          easing: 'easeOutQuart',
-          delay: (ctx) => ctx.dataIndex * 40,
-        },
-        scales: {
-          x: {
-            min: 0,
-            max: 8,
-            grid: {
-              color: '#1a3a5c66',
-              tickLength: 4,
-            },
-            ticks: {
-              color: '#4a6a8a',
-              stepSize: 1,
-              callback: (v) => v === 0 ? '0' : v === 8 ? '8 ▶' : String(v),
-            },
-            border: { color: '#1a3a5c' },
-          },
-          y: {
-            grid: { display: false },
-            ticks: {
-              color: '#8899bb',
-              font: { size: 9 },
-            },
-            border: { color: '#1a3a5c' },
-          },
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: '#0d1420ee',
-            borderColor: '#1a3a5c',
-            borderWidth: 1,
-            titleColor: '#00d4ff',
-            bodyColor: '#c0d8f0',
-            callbacks: {
-              title: (items) => items[0].label,
-              label: (item) => {
-                const sec = sorted[item.dataIndex];
-                const e = sec.entropy;
-                const risk = e > 7 ? ' ⚠ PACKED/ENCRYPTED' : e > 5.5 ? ' high' : e > 3 ? ' normal' : ' low';
-                return [
-                  \`  Entropy  \${e.toFixed(3)}\${risk}\`,
-                  \`  Offset   \${fmtHex(sec.file_offset)}\`,
-                  \`  Size     \${fmtBytes(sec.size)}\`,
-                ];
-              },
-            },
-          },
-          // Entropy scale legend (gradient bar)
-          annotation: undefined,
-        },
-        onClick: (evt, elements) => {
-          if (!elements.length) return;
-          const sec = sorted[elements[0].index];
-          vscode.postMessage({
-            command: 'jumpToOffset',
-            file: currentData.file,
-            offset: sec.file_offset,
-          });
-        },
-        onHover: (evt, elements) => {
-          evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-        },
-      },
-    });
-  }
-
-  // ── Size Heatmap (horizontal bar chart) ────────────────────────────────────
-  function buildSizeChart(sections) {
-    const ctx = document.getElementById('sizeChart').getContext('2d');
-
-    const sortKey = document.getElementById('size-sort').value;
+    const sortKey = document.getElementById('combined-sort').value;
     const sorted  = [...sections].sort(SORT_FN[sortKey] ?? SORT_FN.offset);
     const maxSize = Math.max(...sorted.map(s => s.size), 1);
 
     const labels       = sorted.map(s => s.name);
     const sizes        = sorted.map(s => s.size);
-    const bgColors     = sizes.map(s => entropyToColor((s / maxSize) * 8) + 'cc');
-    const borderColors = sizes.map(s => entropyToColor((s / maxSize) * 8));
+    const bgColors     = sorted.map(s => entropyToColor(s.entropy) + 'bb');
+    const borderColors = sorted.map(s => entropyToColor(s.entropy));
 
-    const barHeight   = 22;
-    const canvasHeight = Math.max(80, sorted.length * barHeight + 40);
-    document.getElementById('sizeChart').style.height = canvasHeight + 'px';
-    document.getElementById('sizeChart').height = canvasHeight;
+    const barHeight    = 24;
+    const legendHeight = 32;
+    const canvasHeight = Math.max(100, sorted.length * barHeight + 60 + legendHeight);
+    canvas.style.height = canvasHeight + 'px';
+    canvas.height = canvasHeight;
 
-    if (sizeChart) { sizeChart.destroy(); }
+    if (combinedChart) { combinedChart.destroy(); }
 
-    sizeChart = new Chart(ctx, {
+    // Plugin: gradient entropy legend strip drawn above chart area
+    const entropyLegendPlugin = {
+      id: 'entropyLegend',
+      afterDraw(chart) {
+        const { ctx: c, chartArea } = chart;
+        if (!chartArea) { return; }
+        const { left, right, top } = chartArea;
+        const stripY = top - legendHeight + 2;
+        const stripH = 10;
+        const w = right - left;
+
+        const grad = c.createLinearGradient(left, 0, right, 0);
+        grad.addColorStop(0,      entropyToColor(0));
+        grad.addColorStop(0.3125, entropyToColor(2.5));
+        grad.addColorStop(0.5,    entropyToColor(4));
+        grad.addColorStop(0.6875, entropyToColor(5.5));
+        grad.addColorStop(0.875,  entropyToColor(7));
+        grad.addColorStop(1,      entropyToColor(8));
+
+        c.save();
+        c.fillStyle = grad;
+        c.beginPath();
+        if (c.roundRect) {
+          c.roundRect(left, stripY, w, stripH, 3);
+        } else {
+          c.rect(left, stripY, w, stripH);
+        }
+        c.fill();
+
+        // tick marks at 0, 2, 4, 6, 8
+        [0, 2, 4, 6, 8].forEach(v => {
+          const x = left + (v / 8) * w;
+          c.fillStyle = 'rgba(0,0,0,0.5)';
+          c.fillRect(x - 0.5, stripY, 1, stripH);
+          c.fillStyle = '#6888a8';
+          c.font = '8px Courier New';
+          c.textAlign = 'center';
+          c.textBaseline = 'top';
+          c.fillText(String(v), x, stripY + stripH + 2);
+        });
+
+        c.fillStyle = '#4a6a8a';
+        c.font = '7px Courier New';
+        c.textAlign = 'right';
+        c.textBaseline = 'top';
+        c.fillText('entropy (bits)', right, stripY + stripH + 12);
+        c.restore();
+      },
+    };
+
+    // Plugin: entropy value labels on bars + neon glow for high-entropy
+    const entropyLabelsPlugin = {
+      id: 'entropyLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx: c, chartArea } = chart;
+        const meta = chart.getDatasetMeta(0);
+        c.save();
+        meta.data.forEach((bar, i) => {
+          const sec    = sorted[i];
+          const e      = sec.entropy;
+          const props  = bar.getProps(['x', 'y', 'height'], true);
+          const bx     = props.x;
+          const by     = props.y;
+          const bh     = props.height;
+          const barW   = bx - chartArea.left;
+          const glowC  = entropyToColor(e);
+
+          // Neon glow overlay for entropy > 6.5
+          if (e > 6.5) {
+            c.save();
+            c.shadowColor = glowC;
+            c.shadowBlur  = 14;
+            c.fillStyle   = glowC + '22';
+            c.fillRect(chartArea.left, by - bh / 2, barW, bh);
+            // second pass for extra glow
+            c.shadowBlur = 8;
+            c.fillStyle  = glowC + '11';
+            c.fillRect(chartArea.left, by - bh / 2, barW, bh);
+            c.restore();
+          }
+
+          // Entropy value label
+          const label = e.toFixed(2);
+          c.font = \`bold 9px 'Courier New', monospace\`;
+          c.textBaseline = 'middle';
+          const textW = c.measureText(label).width;
+          if (barW > textW + 10) {
+            c.fillStyle = 'rgba(0,0,0,0.75)';
+            c.textAlign = 'right';
+            c.fillText(label, bx - 5, by);
+          } else {
+            c.fillStyle = glowC;
+            c.textAlign = 'left';
+            c.fillText(label, bx + 5, by);
+          }
+        });
+        c.restore();
+      },
+    };
+
+    combinedChart = new Chart(ctx, {
       type: 'bar',
+      plugins: [entropyLegendPlugin, entropyLabelsPlugin],
       data: {
         labels,
         datasets: [{
@@ -1136,7 +1114,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
           backgroundColor: bgColors,
           borderColor: borderColors,
           borderWidth: 1,
-          borderRadius: 2,
+          borderRadius: 3,
           hoverBackgroundColor: borderColors,
           barThickness: barHeight - 4,
         }],
@@ -1145,10 +1123,11 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { top: legendHeight } },
         animation: {
           duration: 900,
           easing: 'easeOutQuart',
-          delay: (ctx) => ctx.dataIndex * 40,
+          delay: (actx) => actx.dataIndex * 40,
         },
         scales: {
           x: {
@@ -1180,17 +1159,19 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
               label: (item) => {
                 const sec = sorted[item.dataIndex];
                 const pct = ((sec.size / maxSize) * 100).toFixed(1);
+                const e   = sec.entropy;
+                const risk = e > 7 ? ' ⚠ PACKED/ENCRYPTED' : e > 5.5 ? ' HIGH' : e > 3 ? ' NORMAL' : ' LOW';
                 return [
-                  \`  Size    \${fmtBytes(sec.size)} (\${pct}%)\`,
-                  \`  Offset  \${fmtHex(sec.file_offset)}\`,
-                  \`  Entropy \${sec.entropy.toFixed(3)} bits\`,
+                  \`  Size     \${fmtBytes(sec.size)} (\${pct}%)\`,
+                  \`  Entropy  \${e.toFixed(3)} bits\${risk}\`,
+                  \`  Offset   \${fmtHex(sec.file_offset)}\`,
                 ];
               },
             },
           },
         },
         onClick: (evt, elements) => {
-          if (!elements.length) return;
+          if (!elements.length) { return; }
           const sec = sorted[elements[0].index];
           vscode.postMessage({
             command: 'jumpToOffset',
@@ -1384,12 +1365,9 @@ _Generated by [BinSleuth](https://github.com/long-910/vscode-binsleuth)_
     });
   });
 
-  // ── Sort selectors ─────────────────────────────────────────────────────────
-  document.getElementById('entropy-sort').addEventListener('change', () => {
-    if (currentData) { buildEntropyChart(currentData.sections); }
-  });
-  document.getElementById('size-sort').addEventListener('change', () => {
-    if (currentData) { buildSizeChart(currentData.sections); }
+  // ── Sort selector ──────────────────────────────────────────────────────────
+  document.getElementById('combined-sort').addEventListener('change', () => {
+    if (currentData) { buildCombinedHeatmap(currentData.sections); }
   });
 
   // ── Open button ────────────────────────────────────────────────────────────
@@ -1431,8 +1409,7 @@ _Generated by [BinSleuth](https://github.com/long-910/vscode-binsleuth)_
     // Charts (slight delay so DOM is ready)
     setTimeout(() => {
       buildSectionChart(data.sections);
-      buildEntropyChart(data.sections);
-      buildSizeChart(data.sections);
+      buildCombinedHeatmap(data.sections);
     }, 50);
   }
 
