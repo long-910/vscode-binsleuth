@@ -7,15 +7,32 @@ const BINARY_EXTS = new Set([
 ]);
 
 /**
- * URI → ローカルファイルパスに変換する。
+ * URI → Linux (WSL) ブリッジが読めるファイルパスに変換する。
  *
- * Remote WSL 環境では uri.fsPath が "/Ubuntu/home/..." のように
- * ディストロ名をプレフィックスとして付加することがある。
- * uri.path は常にリモート側の正規パス ("/home/...") を返すため、
- * vscode-remote スキームの場合は uri.path を優先する。
+ * ケース①: vscode-remote (WSL) URI
+ *   uri.fsPath = "/Ubuntu/home/..."  ← ディストロ名プレフィックスが入る
+ *   uri.path   = "/home/..."         ← 正規パス → こちらを使う
+ *
+ * ケース②: Windows ドライブレターパス (c:/... や C:\...)
+ *   WSL では Windows ドライブは /mnt/<drive>/ にマウントされているため変換する
+ *   例: "c:/Users/foo/bar" → "/mnt/c/Users/foo/bar"
  */
 function toLocalPath(uri: vscode.Uri): string {
-  return uri.scheme === 'vscode-remote' ? uri.path : uri.fsPath;
+  if (uri.scheme === 'vscode-remote') {
+    return uri.path;
+  }
+
+  const p = uri.fsPath;
+
+  // Windows drive letter: "C:\..." or "c:/..."  →  "/mnt/c/..."
+  const winDrive = p.match(/^([a-zA-Z]):[/\\](.*)/s);
+  if (winDrive) {
+    const drive = winDrive[1].toLowerCase();
+    const rest  = winDrive[2].replace(/\\/g, '/');
+    return `/mnt/${drive}/${rest}`;
+  }
+
+  return p;
 }
 
 /** URI を持つすべての Tab 種別から URI を取り出す */
