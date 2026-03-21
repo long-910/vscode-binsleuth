@@ -118,6 +118,8 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
         await this._jumpToOffset(msg.file as string, msg.offset as number);
       } else if (msg.command === 'openFile') {
         await this._openFile(msg.file as string);
+      } else if (msg.command === 'exportReport') {
+        await this._exportReport(msg.format as string, msg.content as string, msg.defaultName as string);
       }
     });
   }
@@ -192,6 +194,33 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
       return vscode.Uri.from({ scheme: 'vscode-remote', authority: 'wsl+Ubuntu', path: filePath });
     }
     return vscode.Uri.file(filePath);
+  }
+
+  private async _exportReport(format: string, content: string, defaultName: string): Promise<void> {
+    const ext = format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'md';
+    const base = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const defaultUri = base
+      ? vscode.Uri.joinPath(base, defaultName)
+      : vscode.Uri.file(defaultName);
+
+    const saveUri = await vscode.window.showSaveDialog({
+      defaultUri,
+      filters: {
+        'Report': [ext],
+        'All Files': ['*'],
+      },
+    });
+    if (!saveUri) { return; }
+
+    await vscode.workspace.fs.writeFile(saveUri, Buffer.from(content, 'utf-8'));
+    const openAction = 'Open';
+    const choice = await vscode.window.showInformationMessage(
+      `BinSleuth: Report saved — ${path.basename(saveUri.fsPath)}`,
+      openAction,
+    );
+    if (choice === openAction) {
+      await vscode.commands.executeCommand('vscode.open', saveUri);
+    }
   }
 
   private async _openFile(filePath: string): Promise<void> {
@@ -315,15 +344,14 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
       margin-bottom: 4px;
     }
     .spacer { flex: 1; }
-    #btn-open {
+    .header-btn {
       display: none;
       align-items: center;
       gap: 4px;
       padding: 3px 9px;
       background: transparent;
-      border: 1px solid var(--cyan);
+      border: 1px solid;
       border-radius: 3px;
-      color: var(--cyan);
       font-family: var(--font);
       font-size: 9px;
       letter-spacing: 1px;
@@ -331,11 +359,37 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
       text-transform: uppercase;
       transition: background 0.15s, box-shadow 0.15s;
     }
-    #btn-open:hover {
-      background: rgba(0,212,255,0.12);
-      box-shadow: 0 0 8px var(--cyan);
+    .header-btn.visible { display: flex; }
+    #btn-open  { border-color: var(--cyan);  color: var(--cyan);  }
+    #btn-open:hover  { background: rgba(0,212,255,0.12); box-shadow: 0 0 8px var(--cyan); }
+    #btn-export { border-color: var(--green); color: var(--green); }
+    #btn-export:hover { background: rgba(0,255,136,0.10); box-shadow: 0 0 8px var(--green); }
+
+    /* Export dropdown */
+    #export-wrapper { position: relative; }
+    #export-menu {
+      display: none;
+      position: absolute;
+      right: 0; top: calc(100% + 4px);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      min-width: 150px;
+      z-index: 200;
+      overflow: hidden;
+      animation: fadeIn 0.15s ease;
     }
-    #btn-open.visible { display: flex; }
+    #export-menu.open { display: block; }
+    .export-item {
+      padding: 6px 12px;
+      font-size: 10px;
+      cursor: pointer;
+      color: var(--text);
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .export-item:last-child { border-bottom: none; }
+    .export-item:hover { background: rgba(0,255,136,0.08); color: var(--green); }
     .logo-text {
       font-size: 13px;
       font-weight: bold;
@@ -575,7 +629,15 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     <div class="status-dot" id="status-dot"></div>
     <span class="logo-text">BINSLEUTH</span>
     <div class="spacer"></div>
-    <button id="btn-open" title="Open file in editor">&#x25B6; OPEN</button>
+    <div id="export-wrapper">
+      <button id="btn-export" class="header-btn" title="Export report">&#x2B07; EXPORT</button>
+      <div id="export-menu">
+        <div class="export-item" data-fmt="md">Markdown (.md)</div>
+        <div class="export-item" data-fmt="json">JSON (.json)</div>
+        <div class="export-item" data-fmt="csv">CSV (.csv)</div>
+      </div>
+    </div>
+    <button id="btn-open" class="header-btn" title="Open file in editor">&#x25B6; OPEN</button>
   </div>
   <div id="filename">— NO FILE LOADED —</div>
   <div id="score-row">
@@ -1201,6 +1263,127 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     val.style.textShadow = \`0 0 6px \${color}\`;
   }
 
+  // ── Export ────────────────────────────────────────────────────────────────
+
+  function generateMarkdown(data) {
+    const h = data.security;
+    const date = new Date().toISOString().slice(0, 10);
+    const name = data.file.replace(/\\\\/g, '/').split('/').pop();
+    const score = data.security_score;
+    const bar = '█'.repeat(Math.round(score / 5)) + '░'.repeat(20 - Math.round(score / 5));
+    const flagIcon = (v) => {
+      const s = (v || '').toLowerCase();
+      if (s === 'enabled') return '✅';
+      if (s.startsWith('partial')) return '⚠️';
+      if (s === 'disabled') return '❌';
+      return '—';
+    };
+
+    const sections = [...data.sections].sort((a, b) => a.file_offset - b.file_offset);
+    const sectionRows = sections.map((s, i) => {
+      const perms = (s.permissions.read ? 'R' : '-')
+                  + (s.permissions.write ? 'W' : '-')
+                  + (s.permissions.execute ? 'X' : '-');
+      return \`| \${String(i+1).padStart(2)} | \${s.name.padEnd(18)} | \${fmtBytes(s.size).padStart(9)} | \${fmtHex(s.file_offset)} | \${fmtHex(s.virtual_address)} | \${s.entropy.toFixed(3)} | \${perms} |\`;
+    }).join('\\n');
+
+    const dangerRows = h.dangerous_symbols.length
+      ? h.dangerous_symbols.map(ds => \`- \\\`\${ds.name}\\\` (\${ds.category})\`).join('\\n')
+      : '_None detected._';
+
+    return \`# BinSleuth Analysis Report
+
+| | |
+|---|---|
+| **File** | \\\`\${name}\\\` |
+| **Path** | \\\`\${data.file}\\\` |
+| **Format** | \${h.format} |
+| **Architecture** | \${h.architecture} |
+| **File Size** | \${fmtBytes(data.total_file_size)} |
+| **Sections** | \${data.sections.length} |
+| **Analyzed** | \${date} |
+
+## Security Score
+
+\\\`\${bar}\\\` **\${score} / 100**
+
+## Security Flags
+
+| Flag | Status |
+|------|--------|
+| NX (Non-executable stack) | \${flagIcon(h.nx)} \${h.nx} |
+| PIE (Position-independent) | \${flagIcon(h.pie)} \${h.pie} |
+| RELRO | \${flagIcon(h.relro)} \${h.relro} |
+| Stack Canary | \${flagIcon(h.canary)} \${h.canary} |
+| FORTIFY_SOURCE | \${flagIcon(h.fortify)} \${h.fortify} |
+| Debug Stripped | \${flagIcon(h.stripped)} \${h.stripped} |
+| RPATH | \${flagIcon(h.rpath)} \${h.rpath} |
+
+## Sections
+
+| # | Name | Size | File Offset | Virt. Addr | Entropy | Perms |
+|---|------|-----:|-------------|------------|--------:|-------|
+\${sectionRows}
+
+## Dangerous Symbols
+
+\${dangerRows}
+
+---
+_Generated by [BinSleuth](https://github.com/long-910/vscode-binsleuth)_
+\`;
+  }
+
+  function generateCsv(data) {
+    const header = 'name,size,virtual_address,file_offset,entropy,read,write,execute';
+    const rows = [...data.sections]
+      .sort((a, b) => a.file_offset - b.file_offset)
+      .map(s => [
+        \`"\${s.name}"\`,
+        s.size,
+        s.virtual_address,
+        s.file_offset,
+        s.entropy,
+        s.permissions.read,
+        s.permissions.write,
+        s.permissions.execute,
+      ].join(','));
+    return [header, ...rows].join('\\n');
+  }
+
+  function generateReport(data, fmt) {
+    if (fmt === 'json') { return JSON.stringify(data, null, 2); }
+    if (fmt === 'csv')  { return generateCsv(data); }
+    return generateMarkdown(data);
+  }
+
+  // Export button toggle
+  const btnExport   = document.getElementById('btn-export');
+  const exportMenu  = document.getElementById('export-menu');
+
+  btnExport.addEventListener('click', (e) => {
+    e.stopPropagation();
+    exportMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', () => exportMenu.classList.remove('open'));
+
+  document.querySelectorAll('.export-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!currentData) { return; }
+      const fmt  = item.dataset.fmt;
+      const ext  = fmt === 'json' ? 'json' : fmt === 'csv' ? 'csv' : 'md';
+      const base = currentData.file.replace(/\\\\/g, '/').split('/').pop().replace(/\\.[^.]+$/, '') || 'report';
+      vscode.postMessage({
+        command: 'exportReport',
+        format:      fmt,
+        content:     generateReport(currentData, fmt),
+        defaultName: \`binsleuth-\${base}.\${ext}\`,
+      });
+      exportMenu.classList.remove('open');
+    });
+  });
+
   // ── Sort selectors ─────────────────────────────────────────────────────────
   document.getElementById('entropy-sort').addEventListener('change', () => {
     if (currentData) { buildEntropyChart(currentData.sections); }
@@ -1225,8 +1408,9 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     document.getElementById('error-state').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
 
-    // Show Open button now that we have a file
+    // Show action buttons now that we have a file
     document.getElementById('btn-open').classList.add('visible');
+    document.getElementById('btn-export').classList.add('visible');
 
     // Header
     const name = data.file.replace(/\\\\/g, '/').split('/').pop();
