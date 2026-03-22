@@ -1,0 +1,98 @@
+{
+  "name": "vscode-binsleuth",
+  "displayName": "BinSleuth",
+  "description": "%ext.description%",
+  "version": "0.1.0",
+  "publisher": "long-kudo",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "binary",
+    "elf",
+    "pe",
+    "security",
+    "entropy",
+    "analysis"
+  ],
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/long-910/vscode-binsleuth"
+  },
+  "sponsor": {
+    "url": "https://github.com/sponsors/long-910"
+  },
+  "bugs": {
+    "url": "https://github.com/long-910/vscode-binsleuth/issues"
+  },
+  "license": "MIT",
+  "l10n": "./l10n",
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "binsleuth-sidebar",
+          "title": "BinSleuth",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "binsleuth-sidebar": [
+        {
+          "type": "webview",
+          "id": "binsleuth.analysisView",
+          "name": "%view.analysis%",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "binsleuth.analyzeFile",
+        "title": "%cmd.analyzeFile%",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "binsleuth.analyzeActiveFile",
+        "title": "%cmd.analyzeActiveFile%"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "binsleuth.analyzeFile",
+          "when": "resourceExtname =~ /\\.(elf|exe|dll|so|bin|o|a|dylib)$/i",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "binsleuth.analyzeActiveFile",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build:rust": "cd src-rust && cargo build --release",
+    "build:rust:debug": "cd src-rust && cargo build",
+    "build": "npm run build:rust && npm run compile",
+    "stage-bin": "node -e \"const fs=require('fs'),p=process.platform;const e=p==='win32'?'.exe':'';fs.mkdirSync('bin',{recursive:true});fs.copyFileSync('src-rust/target/release/binsleuth-bridge'+e,'bin/binsleuth-bridge'+e);\"",
+    "package:vsix": "npm run build && npm run stage-bin && vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}
