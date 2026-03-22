@@ -145,9 +145,17 @@ The report includes: binary metadata, per-section table (name · size · offset 
 
 ## Installation
 
+### VS Code Marketplace (Recommended)
+
+1. Open **Extensions** (`Ctrl+Shift+X`) in VS Code.
+2. Search for **BinSleuth**.
+3. Click **Install**.
+
+Or install directly from the [VS Code Marketplace page](https://marketplace.visualstudio.com/items?itemName=long-910.vscode-binsleuth).
+
 ### From GitHub Releases
 
-Download the VSIX for your platform from the [Releases page](https://github.com/long-910/vscode-binsleuth/releases):
+If you need a specific platform build, download the VSIX from the [Releases page](https://github.com/long-910/vscode-binsleuth/releases):
 
 | File | Platform |
 |------|----------|
@@ -184,7 +192,7 @@ Install: **Extensions (Ctrl+Shift+X)** → **⋯** → **Install from VSIX…**
 | Export report (Markdown / JSON / CSV) | ✅ v0.1.0 |
 | Multi-OS support (Windows native, macOS, Linux) | ✅ v0.1.0 |
 | i18n — Japanese & Simplified Chinese | ✅ v0.1.0 |
-| VS Code Marketplace publication | 🔲 planned |
+| VS Code Marketplace publication | ✅ v0.1.0 |
 | Configurable bridge binary path | 🔲 planned |
 | PE / Mach-O format badges | 🔲 planned |
 | Diff view (compare two binaries) | 🔲 planned |
