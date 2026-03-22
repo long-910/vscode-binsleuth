@@ -2,8 +2,6 @@
 
 > 在 VS Code 侧边栏中直接查看节区图、熵热图和安全标志的二进制分析扩展。
 
-![vscode-binsleuth](https://repository-images.githubusercontent.com/1188141623/48b0a80f-364a-4652-98f3-bdbbc541c4ad)
-
 <div align="center">
 
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
@@ -17,13 +15,11 @@
 
 🌐 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh.md)
 
+<br/>
+
+<img src="images/demo.png" width="380" alt="BinSleuth 演示" />
+
 </div>
-
----
-
-## 截图
-
-![BinSleuth 演示](images/demo.png)
 
 ---
 
