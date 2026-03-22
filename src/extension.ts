@@ -25,20 +25,18 @@ const BINARY_EXTS = new Set([
  *   例: "c:/Users/foo/bar"  →  "/mnt/c/Users/foo/bar"
  */
 function toLocalPath(uri: vscode.Uri): string {
-  // ケース①: vscode-remote スキームは uri.path が正規パス
+  // Windows ネイティブ: fsPath をそのまま使う（C:\... や \\wsl.localhost\...）
+  // ブリッジは .exe で直接実行するため WSL パス変換は不要
+  if (process.platform === 'win32') {
+    return uri.fsPath;
+  }
+
+  // ケース①: vscode-remote スキームは uri.path が正規パス（Linux/WSL Remote）
   if (uri.scheme === 'vscode-remote') {
     return uri.path;
   }
 
   const p = uri.fsPath;
-
-  // ケース④: Windows ドライブレター "C:\..." or "c:/..."  →  "/mnt/c/..."
-  const winDrive = p.match(/^([a-zA-Z]):[/\\](.*)/s);
-  if (winDrive) {
-    const drive = winDrive[1].toLowerCase();
-    const rest  = winDrive[2].replace(/\\/g, '/');
-    return `/mnt/${drive}/${rest}`;
-  }
 
   // ケース③: WSL UNC "//wsl.localhost/Ubuntu/home/..."  →  "/home/..."
   const wslUnc = p.match(/^\/\/wsl[^/]*\/[^/]+(\/.*)/);
@@ -47,7 +45,6 @@ function toLocalPath(uri: vscode.Uri): string {
   }
 
   // ケース②: "/<DistroName>/<linux-root>/..."  →  "/<linux-root>/..."
-  // 標準 Linux ルートディレクトリのいずれかで始まる第2コンポーネントを検出する
   const LINUX_ROOTS = /^\/(home|usr|opt|mnt|tmp|var|etc|bin|lib|run|srv|sys|proc|dev|root|boot)\b/;
   const distroPrefix = p.match(/^\/[^/]+(\/.*)/);
   if (distroPrefix && LINUX_ROOTS.test(distroPrefix[1])) {

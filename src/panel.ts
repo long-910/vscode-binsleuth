@@ -60,41 +60,9 @@ function getNonce(): string {
 }
 
 /**
- * Windows パス → WSL パスに変換する。
- * 例: "C:\Users\foo\bar"  →  "/mnt/c/Users/foo/bar"
- * WSL UNC パス "\\wsl.localhost\Ubuntu\home\..." → "/home/..."
- * 既に Unix スタイルのパスはそのまま返す。
- */
-function toWslPath(winPath: string): string {
-  // Windows drive letter: C:\foo → /mnt/c/foo
-  const drive = winPath.match(/^([a-zA-Z]):[/\\](.*)/s);
-  if (drive) {
-    return `/mnt/${drive[1].toLowerCase()}/${drive[2].replace(/\\/g, '/')}`;
-  }
-  // WSL UNC: \\wsl.localhost\Ubuntu\home\foo → /home/foo (strip distro prefix)
-  const unc = winPath.match(/^[/\\]{2}wsl[^/\\]*[/\\][^/\\]+((?:[/\\].*)?)/s);
-  if (unc) {
-    return unc[1].replace(/\\/g, '/') || '/';
-  }
-  return winPath;
-}
-
-/**
- * WSL パス（/mnt/c/...）を Windows パスに逆変換する。
- * 例: "/mnt/c/Users/foo/bar"  →  "C:\Users\foo\bar"
- * それ以外はそのまま返す。
- */
-function toWindowsPath(wslPath: string): string {
-  const mnt = wslPath.match(/^\/mnt\/([a-z])\/(.*)/s);
-  if (mnt) {
-    return `${mnt[1].toUpperCase()}:\\${mnt[2].replace(/\//g, '\\')}`;
-  }
-  return wslPath;
-}
-
-/**
  * ブリッジバイナリを探す。
- * Windows では .exe（ネイティブ）を優先し、なければ Linux ELF（WSL経由）にフォールバック。
+ * Windows では .exe（ネイティブ）のみ。
+ * Linux / macOS では ELF/Mach-O バイナリを探す。
  * 戻り値の native フラグが true のときはそのまま直接実行、false のときは wsl.exe 経由。
  */
 function findBridgeBinary(
@@ -104,16 +72,11 @@ function findBridgeBinary(
   const linuxName = 'binsleuth-bridge';
 
   if (process.platform === 'win32') {
-    // 1st: native Windows binary (.exe)
+    // Windows ネイティブ .exe のみを使用（WSL 不要）
     const exeName = 'binsleuth-bridge.exe';
-    for (const dir of ['bin', 'src-rust/target/release', 'src-rust/target/debug']) {
+    for (const dir of ['bin', 'src-rust/target/x86_64-pc-windows-gnu/release', 'src-rust/target/release']) {
       const p = path.join(base, dir, exeName);
       if (fs.existsSync(p)) { return { path: p, native: true }; }
-    }
-    // 2nd: Linux ELF via wsl.exe (fallback for local WSL dev)
-    for (const dir of ['bin', 'src-rust/target/release', 'src-rust/target/debug']) {
-      const p = path.join(base, dir, linuxName);
-      if (fs.existsSync(p)) { return { path: p, native: false }; }
     }
     return undefined;
   }
@@ -244,24 +207,12 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     //   Linux / macOS          → 直接実行
     let cmd: string;
     let args: string[];
-    if (process.platform === 'win32' && bridge.native) {
-      cmd = bridge.path;
-      args = [toWindowsPath(filePath)];
-    } else if (process.platform === 'win32' && !bridge.native) {
-      // /mnt/c は noexec マウントのため直接実行不可。
-      // WSL ホームキャッシュにコピーしてから実行する。
-      const wslSrc  = toWslPath(bridge.path);
-      const wslDest = '~/.cache/vscode-binsleuth/binsleuth-bridge';
-      const stageCmd = [
-        `mkdir -p ~/.cache/vscode-binsleuth`,
-        `cp "${wslSrc}" ${wslDest}`,
-        `chmod +x ${wslDest}`,
-        `${wslDest} "${filePath}"`,
-      ].join(' && ');
-      cmd  = 'wsl.exe';
-      args = ['sh', '-c', stageCmd];
+    if (process.platform === 'win32') {
+      // Windows ネイティブ .exe を直接実行（WSL 不要）
+      cmd  = bridge.path;
+      args = [filePath];
     } else {
-      cmd = bridge.path;
+      cmd  = bridge.path;
       args = [filePath];
     }
 
@@ -294,17 +245,10 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ command: 'error', message });
   }
 
-  /** WSL パスから VS Code が開ける URI を構築する。 */
+  /** ファイルパスから VS Code が開ける URI を構築する。 */
   private _fileUri(filePath: string): vscode.Uri {
-    if (process.platform === 'win32') {
-      // /mnt/c/... はそのまま Windows パスに戻して file:// にする
-      const mnt = filePath.match(/^\/mnt\/([a-z])\/(.*)/s);
-      if (mnt) {
-        return vscode.Uri.file(`${mnt[1].toUpperCase()}:\\${mnt[2].replace(/\//g, '\\')}`);
-      }
-      // /home/... など WSL 内のパスは vscode-remote URI で開く
-      return vscode.Uri.from({ scheme: 'vscode-remote', authority: 'wsl+Ubuntu', path: filePath });
-    }
+    // Windows ネイティブ: fsPath はそのまま file:// URI にする（C:\... や \\wsl.localhost\...）
+    // Linux/macOS: 通常の file:// URI
     return vscode.Uri.file(filePath);
   }
 
