@@ -2,6 +2,8 @@
 
 > Binary analysis — section map, entropy heatmap, and security flags right inside VS Code.
 
+![vscode-binsleuth](https://repository-images.githubusercontent.com/1188141623/48b0a80f-364a-4652-98f3-bdbbc541c4ad)
+
 <div align="center">
 
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?style=flat-square)](https://code.visualstudio.com/)
@@ -14,10 +16,6 @@
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/long910)
 
 🌐 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh.md)
-
-<br/>
-
-<img src="images/demo.png" width="380" alt="BinSleuth demo" />
 
 </div>
 
@@ -35,6 +33,12 @@ Binary file  ──►  binsleuth-bridge (Rust)  ──►  JSON  ──►  Web
 ```
 
 The Rust bridge runs as a subprocess — **no network calls, no telemetry**.
+
+---
+
+<div align="center">
+<img src="images/demo.png" width="380" alt="BinSleuth demo" />
+</div>
 
 ---
 
