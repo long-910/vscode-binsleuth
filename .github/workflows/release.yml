@@ -35,7 +35,7 @@ jobs:
             bin_name: binsleuth-bridge.exe
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -49,7 +49,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.rust_target }}
         working-directory: src-rust
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -72,7 +72,7 @@ jobs:
       - name: Package VSIX
         run: vsce package --target ${{ matrix.vsce_target }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vsix-${{ matrix.vsce_target }}
           path: "*.vsix"
@@ -87,11 +87,11 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: vsix-artifacts
           pattern: vsix-*
@@ -126,7 +126,7 @@ jobs:
     if: ${{ !contains(github.ref_name, '-') && vars.MARKETPLACE_PUBLISH == 'true' }}
 
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: vsix-artifacts
           pattern: vsix-*
