@@ -24,11 +24,6 @@ jobs:
             vsce_target: darwin-arm64
             bin_name: binsleuth-bridge
 
-          - os: macos-13
-            rust_target: x86_64-apple-darwin
-            vsce_target: darwin-x64
-            bin_name: binsleuth-bridge
-
           - os: windows-latest
             rust_target: x86_64-pc-windows-msvc
             vsce_target: win32-x64
