@@ -167,7 +167,6 @@ If you need a specific platform build, download the VSIX from the [Releases page
 |------|----------|
 | `*-linux-x64.vsix` | Linux x64 |
 | `*-darwin-arm64.vsix` | macOS Apple Silicon |
-| `*-darwin-x64.vsix` | macOS Intel |
 | `*-win32-x64.vsix` | Windows x64 |
 
 Install: **Extensions (Ctrl+Shift+X)** → **⋯** → **Install from VSIX…**
