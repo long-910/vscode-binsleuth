@@ -1,7 +1,7 @@
 {
   "BinSleuth: No file selected.": "BinSleuth: ファイルが選択されていません。",
   "BinSleuth: No active file.": "BinSleuth: アクティブファイルがありません。",
-  "Bridge binary not found.\n\nRun: npm run build:rust\n(Windows: binsleuth-bridge.exe not found; WSL fallback also unavailable)": "ブリッジバイナリが見つかりません。\n\n実行してください: npm run build:rust\n(Windows: binsleuth-bridge.exe が見つからず、WSL フォールバックも利用できません)",
+  "Bridge binary not found.\n\nRun: npm run build:rust": "ブリッジバイナリが見つかりません。\n\n実行してください: npm run build:rust",
   "Open": "開く",
   "BinSleuth: Report saved — {0}": "BinSleuth: レポートを保存しました — {0}",
   "BinSleuth — Jump to offset {0} in {1}": "BinSleuth — {1} のオフセット {0} へジャンプ",

@@ -59,32 +59,14 @@ function getNonce(): string {
   return result;
 }
 
-/**
- * ブリッジバイナリを探す。
- * Windows では .exe（ネイティブ）のみ。
- * Linux / macOS では ELF/Mach-O バイナリを探す。
- * 戻り値の native フラグが true のときはそのまま直接実行、false のときは wsl.exe 経由。
- */
-function findBridgeBinary(
-  extensionUri: vscode.Uri,
-): { path: string; native: boolean } | undefined {
-  const base = extensionUri.fsPath;
-  const linuxName = 'binsleuth-bridge';
-
-  if (process.platform === 'win32') {
-    // Windows ネイティブ .exe のみを使用（WSL 不要）
-    const exeName = 'binsleuth-bridge.exe';
-    for (const dir of ['bin', 'src-rust/target/x86_64-pc-windows-gnu/release', 'src-rust/target/release']) {
-      const p = path.join(base, dir, exeName);
-      if (fs.existsSync(p)) { return { path: p, native: true }; }
-    }
-    return undefined;
-  }
-
-  // Linux / macOS: native binary
-  for (const dir of ['bin', 'src-rust/target/release', 'src-rust/target/debug']) {
-    const p = path.join(base, dir, linuxName);
-    if (fs.existsSync(p)) { return { path: p, native: true }; }
+/** ブリッジバイナリのパスを返す。見つからなければ undefined。 */
+function findBridgeBinary(extensionUri: vscode.Uri): string | undefined {
+  const base     = extensionUri.fsPath;
+  const binName  = process.platform === 'win32' ? 'binsleuth-bridge.exe' : 'binsleuth-bridge';
+  const searchDirs = ['bin', 'src-rust/target/release', 'src-rust/target/debug'];
+  for (const dir of searchDirs) {
+    const p = path.join(base, dir, binName);
+    if (fs.existsSync(p)) { return p; }
   }
   return undefined;
 }
@@ -194,31 +176,16 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     const bridge = findBridgeBinary(this._extensionUri);
     if (!bridge) {
       this._postError(
-        vscode.l10n.t('Bridge binary not found.\n\nRun: npm run build:rust\n(Windows: binsleuth-bridge.exe not found; WSL fallback also unavailable)'),
+        vscode.l10n.t('Bridge binary not found.\n\nRun: npm run build:rust'),
       );
       return;
     }
 
     this._postStatus('analyzing', path.basename(filePath));
 
-    // 実行方式を決定:
-    //   Windows + native .exe  → 直接実行（WSL 不要）、パスは Windows 形式に変換
-    //   Windows + Linux ELF    → wsl.exe 経由（フォールバック）、パスは WSL 形式のまま
-    //   Linux / macOS          → 直接実行
-    let cmd: string;
-    let args: string[];
-    if (process.platform === 'win32') {
-      // Windows ネイティブ .exe を直接実行（WSL 不要）
-      cmd  = bridge.path;
-      args = [filePath];
-    } else {
-      cmd  = bridge.path;
-      args = [filePath];
-    }
-
     cp.execFile(
-      cmd,
-      args,
+      bridge,
+      [filePath],
       { maxBuffer: 8 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
@@ -245,10 +212,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ command: 'error', message });
   }
 
-  /** ファイルパスから VS Code が開ける URI を構築する。 */
   private _fileUri(filePath: string): vscode.Uri {
-    // Windows ネイティブ: fsPath はそのまま file:// URI にする（C:\... や \\wsl.localhost\...）
-    // Linux/macOS: 通常の file:// URI
     return vscode.Uri.file(filePath);
   }
 

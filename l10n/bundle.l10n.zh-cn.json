@@ -1,7 +1,7 @@
 {
   "BinSleuth: No file selected.": "BinSleuth: 未选择文件。",
   "BinSleuth: No active file.": "BinSleuth: 没有活动文件。",
-  "Bridge binary not found.\n\nRun: npm run build:rust\n(Windows: binsleuth-bridge.exe not found; WSL fallback also unavailable)": "未找到桥接二进制文件。\n\n请运行: npm run build:rust\n(Windows: 未找到 binsleuth-bridge.exe，WSL 回退也不可用)",
+  "Bridge binary not found.\n\nRun: npm run build:rust": "未找到桥接二进制文件。\n\n请运行: npm run build:rust",
   "Open": "打开",
   "BinSleuth: Report saved — {0}": "BinSleuth: 报告已保存 — {0}",
   "BinSleuth — Jump to offset {0} in {1}": "BinSleuth — 跳转到 {1} 中的偏移量 {0}",
