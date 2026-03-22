@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 jobs:
   # ── Build bridge + package VSIX for each platform ──────────────────────────
@@ -22,6 +23,11 @@ jobs:
           - os: macos-latest
             rust_target: aarch64-apple-darwin
             vsce_target: darwin-arm64
+            bin_name: binsleuth-bridge
+
+          - os: macos-latest
+            rust_target: x86_64-apple-darwin
+            vsce_target: darwin-x64
             bin_name: binsleuth-bridge
 
           - os: windows-latest
