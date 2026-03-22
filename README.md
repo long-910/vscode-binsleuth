@@ -42,6 +42,12 @@ The Rust bridge runs as a subprocess — **no network calls, no telemetry**.
 
 ---
 
+<div align="center">
+<img src="images/demo.png" width="380" alt="BinSleuth demo" />
+</div>
+
+---
+
 ## Features
 
 ### Section Map
