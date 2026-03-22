@@ -21,6 +21,12 @@
 
 ---
 
+## 截图
+
+![BinSleuth 演示](images/demo.png)
+
+---
+
 ## 功能概览
 
 ```
