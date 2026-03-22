@@ -1,6 +1,6 @@
 # vscode-binsleuth
 
->  binary analysis — section map, section heatmap, and security flags right inside VS Code.
+> Binary analysis — section map, entropy heatmap, and security flags right inside VS Code.
 
 ![vscode-binsleuth](https://repository-images.githubusercontent.com/1188141623/48b0a80f-364a-4652-98f3-bdbbc541c4ad)
 
@@ -18,32 +18,6 @@
 🌐 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh.md)
 
 </div>
-
----
-
-## Quick Start
-
-**1. Build the Rust bridge** (one-time, requires Rust 1.85+)
-
-```bash
-git clone https://github.com/long-910/vscode-binsleuth.git
-cd vscode-binsleuth
-npm install
-npm run build:rust      # compiles src-rust/ → bin/binsleuth-bridge
-npm run compile         # compiles TypeScript
-```
-
-**2. Open the Extension Development Host**
-
-Press **F5** in VS Code.
-A new window opens with the extension active.
-
-**3. Analyze a binary**
-
-Open any `.elf`, `.exe`, `.dll`, `.so`, `.bin`, `.o`, `.a`, `.dylib`, or `.out` file —
-the BinSleuth sidebar updates automatically.
-
-> **Tip:** Click the crosshair icon (⊕) in the Activity Bar to open the BinSleuth panel at any time.
 
 ---
 
@@ -84,7 +58,7 @@ A horizontal bar chart that visualises **both size and entropy** of every sectio
 | Number on bar | Exact entropy value |
 | Neon glow | Entropy > 6.5 — likely packed or encrypted content |
 
-A gradient colour legend (0 – 8 bits) is drawn above the chart for reference.
+A gradient colour legend (0–8 bits) is drawn above the chart for reference.
 
 **Sort selector** (top-right of the panel):
 
@@ -161,98 +135,38 @@ The report includes: binary metadata, per-section table (name · size · offset 
 
 ## WSL / Windows Support
 
-### VS Code running inside WSL (Remote - WSL)
-
-Works out of the box.
-The bridge binary is a Linux ELF (`bin/binsleuth-bridge`) invoked directly.
-
-### VS Code running on Windows (native)
-
-When the `win32-x64` VSIX (from GitHub Releases) is installed, the extension runs the native `binsleuth-bridge.exe` directly — **no WSL required**.
-
-When built from source in WSL, the extension falls back to calling the Linux bridge via `wsl.exe`:
-
-```
-wsl.exe <wsl-path-to-bridge> <wsl-path-to-file>
-```
-
-| Scenario | Binary used | WSL required? |
-|----------|-------------|:---:|
-| Installed from `win32-x64` VSIX | `binsleuth-bridge.exe` (native) | No |
-| Built locally from WSL, tested in Windows VS Code | `binsleuth-bridge` (Linux ELF via `wsl.exe`) | Yes |
+| Scenario | WSL required? |
+|----------|:---:|
+| VS Code inside WSL (Remote - WSL) | No |
+| Windows VS Code with `win32-x64` VSIX | No |
+| Windows VS Code with a locally-built VSIX from WSL | Yes |
 
 ---
 
 ## Installation
 
-### Build from Source
+### From GitHub Releases
 
-```bash
-git clone https://github.com/long-910/vscode-binsleuth.git
-cd vscode-binsleuth
-npm install
-npm run build:rust      # Rust bridge → bin/binsleuth-bridge (Linux/macOS)
-                        #             → bin/binsleuth-bridge.exe (Windows)
-npm run compile         # TypeScript → out/
-```
+Download the VSIX for your platform from the [Releases page](https://github.com/long-910/vscode-binsleuth/releases):
 
-Press **F5** to launch an Extension Development Host.
+| File | Platform |
+|------|----------|
+| `*-linux-x64.vsix` | Linux x64 |
+| `*-darwin-arm64.vsix` | macOS Apple Silicon |
+| `*-darwin-x64.vsix` | macOS Intel |
+| `*-win32-x64.vsix` | Windows x64 |
 
-### Build a VSIX (install into any VS Code)
+Install: **Extensions (Ctrl+Shift+X)** → **⋯** → **Install from VSIX…**
 
-```bash
-npm install -g @vscode/vsce
-npm run build           # build:rust + compile
-vsce package            # → vscode-binsleuth-0.1.0.vsix
-```
-
-Install the `.vsix`:
-**Extensions (Ctrl+Shift+X)** → **⋯** → **Install from VSIX…**
+> **Windows tip:** Save the `.vsix` to a local Windows drive (e.g. `C:\Users\...\Downloads\`) before installing — VS Code cannot install from a WSL UNC path.
 
 ### Requirements
 
 | Dependency | Version | Notes |
 |-----------|---------|-------|
 | VS Code | ≥ 1.85 | |
-| Rust toolchain | ≥ 1.85 | Build only — not needed at runtime |
 | [Hex Editor](https://marketplace.visualstudio.com/items?itemName=ms-vscode.hexeditor) | any | Optional — enables click-to-offset navigation |
-| WSL (Windows only) | any | Required for native Windows VS Code |
-
----
-
-## Development
-
-```bash
-# Watch TypeScript (auto-recompile on save)
-npm run watch
-
-# Rebuild Rust bridge after editing src-rust/
-npm run build:rust
-
-# Launch Extension Development Host
-# → Press F5 in VS Code (config: .vscode/launch.json)
-```
-
-Project structure:
-
-```
-vscode-binsleuth/
-├── src-rust/
-│   ├── Cargo.toml          # binsleuth 0.4 + serde_json + anyhow
-│   └── src/main.rs         # CLI: reads binary → JSON stdout
-├── src/
-│   ├── extension.ts        # activate(), commands, auto-detection, path normalization
-│   └── panel.ts            # WebviewViewProvider + Webview HTML/CSS/JS
-├── bin/                    # compiled bridge binary (git-ignored)
-├── resources/
-│   └── icon.svg            # Activity Bar icon
-└── .vscode/
-    ├── launch.json         # F5 debug config
-    └── tasks.json          # TypeScript build task
-```
-
-The bridge outputs a single JSON object to stdout and exits.
-The extension reads it via `child_process.execFile` and passes it to the Webview.
+| WSL (Windows only) | any | Only needed when not using the `win32-x64` VSIX |
 
 ---
 
@@ -268,7 +182,8 @@ The extension reads it via `child_process.execFile` and passes it to the Webview
 | Click-to-offset navigation | ✅ v0.1.0 |
 | Auto-analysis on binary open | ✅ v0.1.0 |
 | Export report (Markdown / JSON / CSV) | ✅ v0.1.0 |
-| WSL / Windows-native VS Code support | ✅ v0.1.0 |
+| Multi-OS support (Windows native, macOS, Linux) | ✅ v0.1.0 |
+| i18n — Japanese & Simplified Chinese | ✅ v0.1.0 |
 | VS Code Marketplace publication | 🔲 planned |
 | Configurable bridge binary path | 🔲 planned |
 | PE / Mach-O format badges | 🔲 planned |
@@ -280,6 +195,12 @@ The extension reads it via `child_process.execFile` and passes it to the Webview
 
 - [BinSleuth](https://github.com/long-910/BinSleuth) — the underlying Rust analysis library
 - [vscode-claude-status](https://github.com/long-910/vscode-claude-status) — Claude Code token usage in the VS Code status bar
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, build instructions, and project architecture.
 
 ---
 
