@@ -63,7 +63,11 @@ function getNonce(): string {
 function findBridgeBinary(extensionUri: vscode.Uri): string | undefined {
   const base     = extensionUri.fsPath;
   const binName  = process.platform === 'win32' ? 'binsleuth-bridge.exe' : 'binsleuth-bridge';
-  const searchDirs = ['bin', 'src-rust/target/release', 'src-rust/target/debug'];
+  const searchDirs = [
+    'bin',
+    `src-rust/target/release`,
+    `src-rust/target/debug`,
+  ];
   for (const dir of searchDirs) {
     const p = path.join(base, dir, binName);
     if (fs.existsSync(p)) { return p; }

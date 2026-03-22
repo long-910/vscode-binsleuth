@@ -87,9 +87,8 @@
     "build:rust": "cd src-rust && cargo build --release",
     "build:rust:debug": "cd src-rust && cargo build",
     "build": "npm run build:rust && npm run compile",
-    "stage-bin": "mkdir -p bin && cp src-rust/target/release/binsleuth-bridge bin/",
-    "package:vsix": "npm run build && npm run stage-bin && vsce package",
-    "package:vsix-win": "npm run package:vsix && bash -c 'DEST=$(wslpath -u \"$(cmd.exe /c \"echo %USERPROFILE%\" 2>/dev/null | tr -d \"\\r\")/Downloads\") && cp -v *.vsix \"$DEST/\" && echo \"Installed to $DEST\"'"
+    "stage-bin": "node -e \"const fs=require('fs'),p=process.platform;const e=p==='win32'?'.exe':'';fs.mkdirSync('bin',{recursive:true});fs.copyFileSync('src-rust/target/release/binsleuth-bridge'+e,'bin/binsleuth-bridge'+e);\"",
+    "package:vsix": "npm run build && npm run stage-bin && vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
