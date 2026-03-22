@@ -68,7 +68,7 @@
       "explorer/context": [
         {
           "command": "binsleuth.analyzeFile",
-          "when": "resourceExtname =~ /\\.(elf|exe|dll|so|bin|o|a|dylib)$/i",
+          "when": "!explorerResourceIsFolder",
           "group": "navigation"
         }
       ],
