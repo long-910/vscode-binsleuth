@@ -15,6 +15,7 @@
   "AWAITING TARGET": "解析待機中",
   "Open an ELF / PE / binary file,": "ELF / PE / バイナリファイルを開くか、",
   "or right-click a file and choose": "ファイルを右クリックして選択:",
+  "BinSleuth: Analyze Binary": "BinSleuth: バイナリを解析",
   "Security Flags": "セキュリティフラグ",
   "Binary Info": "バイナリ情報",
   "⚠ Dangerous Symbols": "⚠ 危険なシンボル",

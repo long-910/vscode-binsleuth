@@ -146,7 +146,7 @@ function buildI18n(): Record<string, string> {
     awaitingTarget:  t('AWAITING TARGET'),
     emptyHintLine1:  t('Open an ELF / PE / binary file,'),
     emptyHintLine2:  t('or right-click a file and choose'),
-    analyzeCmd:      t('%cmd.analyzeFile%'),
+    analyzeCmd:      t('BinSleuth: Analyze Binary'),
     // Panel titles
     panelSecurity:   t('Security Flags'),
     panelInfo:       t('Binary Info'),
