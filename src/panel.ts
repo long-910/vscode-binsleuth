@@ -248,8 +248,18 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
       cmd = bridge.path;
       args = [toWindowsPath(filePath)];
     } else if (process.platform === 'win32' && !bridge.native) {
-      cmd = 'wsl.exe';
-      args = [toWslPath(bridge.path), filePath];
+      // /mnt/c は noexec マウントのため直接実行不可。
+      // WSL ホームキャッシュにコピーしてから実行する。
+      const wslSrc  = toWslPath(bridge.path);
+      const wslDest = '~/.cache/vscode-binsleuth/binsleuth-bridge';
+      const stageCmd = [
+        `mkdir -p ~/.cache/vscode-binsleuth`,
+        `cp "${wslSrc}" ${wslDest}`,
+        `chmod +x ${wslDest}`,
+        `${wslDest} "${filePath}"`,
+      ].join(' && ');
+      cmd  = 'wsl.exe';
+      args = ['sh', '-c', stageCmd];
     } else {
       cmd = bridge.path;
       args = [filePath];
