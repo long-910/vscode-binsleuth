@@ -1,0 +1,6 @@
+{
+  "ext.description": "二进制分析可视化工具 — 节区图、熵热图、安全标志",
+  "cmd.analyzeFile": "BinSleuth: 分析二进制文件",
+  "cmd.analyzeActiveFile": "BinSleuth: 分析当前文件",
+  "view.analysis": "分析"
+}

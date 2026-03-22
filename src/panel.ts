@@ -62,31 +62,128 @@ function getNonce(): string {
 /**
  * Windows パス → WSL パスに変換する。
  * 例: "C:\Users\foo\bar"  →  "/mnt/c/Users/foo/bar"
+ * WSL UNC パス "\\wsl.localhost\Ubuntu\home\..." → "/home/..."
  * 既に Unix スタイルのパスはそのまま返す。
  */
 function toWslPath(winPath: string): string {
-  const m = winPath.match(/^([a-zA-Z]):[/\\](.*)/s);
-  if (m) {
-    return `/mnt/${m[1].toLowerCase()}/${m[2].replace(/\\/g, '/')}`;
+  // Windows drive letter: C:\foo → /mnt/c/foo
+  const drive = winPath.match(/^([a-zA-Z]):[/\\](.*)/s);
+  if (drive) {
+    return `/mnt/${drive[1].toLowerCase()}/${drive[2].replace(/\\/g, '/')}`;
+  }
+  // WSL UNC: \\wsl.localhost\Ubuntu\home\foo → /home/foo (strip distro prefix)
+  const unc = winPath.match(/^[/\\]{2}wsl[^/\\]*[/\\][^/\\]+((?:[/\\].*)?)/s);
+  if (unc) {
+    return unc[1].replace(/\\/g, '/') || '/';
   }
   return winPath;
 }
 
 /**
- * ブリッジバイナリを探す。
- * バイナリは常に Linux ELF（.exe なし）。Windows でも同名で存在し wsl.exe 経由で実行する。
+ * WSL パス（/mnt/c/...）を Windows パスに逆変換する。
+ * 例: "/mnt/c/Users/foo/bar"  →  "C:\Users\foo\bar"
+ * それ以外はそのまま返す。
  */
-function findBridgeBinary(extensionUri: vscode.Uri): string | undefined {
+function toWindowsPath(wslPath: string): string {
+  const mnt = wslPath.match(/^\/mnt\/([a-z])\/(.*)/s);
+  if (mnt) {
+    return `${mnt[1].toUpperCase()}:\\${mnt[2].replace(/\//g, '\\')}`;
+  }
+  return wslPath;
+}
+
+/**
+ * ブリッジバイナリを探す。
+ * Windows では .exe（ネイティブ）を優先し、なければ Linux ELF（WSL経由）にフォールバック。
+ * 戻り値の native フラグが true のときはそのまま直接実行、false のときは wsl.exe 経由。
+ */
+function findBridgeBinary(
+  extensionUri: vscode.Uri,
+): { path: string; native: boolean } | undefined {
   const base = extensionUri.fsPath;
-  const name = 'binsleuth-bridge';
+  const linuxName = 'binsleuth-bridge';
 
-  const candidates = [
-    path.join(base, 'bin', name),
-    path.join(base, 'src-rust', 'target', 'release', name),
-    path.join(base, 'src-rust', 'target', 'debug', name),
-  ];
+  if (process.platform === 'win32') {
+    // 1st: native Windows binary (.exe)
+    const exeName = 'binsleuth-bridge.exe';
+    for (const dir of ['bin', 'src-rust/target/release', 'src-rust/target/debug']) {
+      const p = path.join(base, dir, exeName);
+      if (fs.existsSync(p)) { return { path: p, native: true }; }
+    }
+    // 2nd: Linux ELF via wsl.exe (fallback for local WSL dev)
+    for (const dir of ['bin', 'src-rust/target/release', 'src-rust/target/debug']) {
+      const p = path.join(base, dir, linuxName);
+      if (fs.existsSync(p)) { return { path: p, native: false }; }
+    }
+    return undefined;
+  }
 
-  return candidates.find((p) => fs.existsSync(p));
+  // Linux / macOS: native binary
+  for (const dir of ['bin', 'src-rust/target/release', 'src-rust/target/debug']) {
+    const p = path.join(base, dir, linuxName);
+    if (fs.existsSync(p)) { return { path: p, native: true }; }
+  }
+  return undefined;
+}
+
+// ── i18n ──────────────────────────────────────────────────────────────────────
+
+function buildI18n(): Record<string, string> {
+  const t = vscode.l10n.t.bind(vscode.l10n);
+  return {
+    // Header
+    noFileLoaded:    t('— NO FILE LOADED —'),
+    score:           t('SCORE'),
+    analyzing:       t('ANALYZING'),
+    // Buttons
+    btnExport:       t('EXPORT'),
+    btnOpen:         t('OPEN'),
+    // Export menu
+    exportMd:        t('Markdown (.md)'),
+    exportJson:      t('JSON (.json)'),
+    exportCsv:       t('CSV (.csv)'),
+    // Empty state
+    awaitingTarget:  t('AWAITING TARGET'),
+    emptyHintLine1:  t('Open an ELF / PE / binary file,'),
+    emptyHintLine2:  t('or right-click a file and choose'),
+    analyzeCmd:      t('%cmd.analyzeFile%'),
+    // Panel titles
+    panelSecurity:   t('Security Flags'),
+    panelInfo:       t('Binary Info'),
+    panelDangerous:  t('⚠ Dangerous Symbols'),
+    panelSectionMap: t('Section Map'),
+    panelHeatmap:    t('Section Heatmap'),
+    // Sort options
+    sortOffset:      t('OFFSET ↑'),
+    sortSizeDesc:    t('SIZE ↓'),
+    sortSizeAsc:     t('SIZE ↑'),
+    sortEntropyDesc: t('ENTROPY ↓'),
+    sortEntropyAsc:  t('ENTROPY ↑'),
+    sortName:        t('NAME A-Z'),
+    // Binary info keys
+    keyFormat:       t('FORMAT'),
+    keyArch:         t('ARCH'),
+    keyFileSize:     t('FILE SIZE'),
+    keySections:     t('SECTIONS'),
+    // Section detail keys
+    keyName:         t('NAME'),
+    keySize:         t('SIZE'),
+    keyOffset:       t('OFFSET'),
+    keyVaddr:        t('VADDR'),
+    keyEntropy:      t('ENTROPY'),
+    keyPerms:        t('PERMS'),
+    // Entropy risk labels
+    riskPacked:      t('⚠ PACKED/ENCRYPTED'),
+    riskHigh:        t('HIGH'),
+    riskNormal:      t('NORMAL'),
+    riskLow:         t('LOW'),
+    // Chart / tooltip
+    entropyBits:     t('entropy (bits)'),
+    sections:        t('SECTIONS'),
+    ttSize:          t('Size'),
+    ttOffset:        t('Offset'),
+    ttEntropy:       t('Entropy'),
+  };
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -134,22 +231,27 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     const bridge = findBridgeBinary(this._extensionUri);
     if (!bridge) {
       this._postError(
-        'Bridge binary not found.\n\nRun: npm run build:rust',
+        vscode.l10n.t('Bridge binary not found.\n\nRun: npm run build:rust\n(Windows: binsleuth-bridge.exe not found; WSL fallback also unavailable)'),
       );
       return;
     }
 
     this._postStatus('analyzing', path.basename(filePath));
 
-    // Windows ネイティブ VS Code では Rust ブリッジ（Linux ELF）を
-    // wsl.exe 経由で実行し、パスも WSL 形式に変換して渡す。
+    // 実行方式を決定:
+    //   Windows + native .exe  → 直接実行（WSL 不要）、パスは Windows 形式に変換
+    //   Windows + Linux ELF    → wsl.exe 経由（フォールバック）、パスは WSL 形式のまま
+    //   Linux / macOS          → 直接実行
     let cmd: string;
     let args: string[];
-    if (process.platform === 'win32') {
+    if (process.platform === 'win32' && bridge.native) {
+      cmd = bridge.path;
+      args = [toWindowsPath(filePath)];
+    } else if (process.platform === 'win32' && !bridge.native) {
       cmd = 'wsl.exe';
-      args = [toWslPath(bridge), toWslPath(filePath)];
+      args = [toWslPath(bridge.path), filePath];
     } else {
-      cmd = bridge;
+      cmd = bridge.path;
       args = [filePath];
     }
 
@@ -213,9 +315,9 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     if (!saveUri) { return; }
 
     await vscode.workspace.fs.writeFile(saveUri, Buffer.from(content, 'utf-8'));
-    const openAction = 'Open';
+    const openAction = vscode.l10n.t('Open');
     const choice = await vscode.window.showInformationMessage(
-      `BinSleuth: Report saved — ${path.basename(saveUri.fsPath)}`,
+      vscode.l10n.t('BinSleuth: Report saved — {0}', path.basename(saveUri.fsPath)),
       openAction,
     );
     if (choice === openAction) {
@@ -258,7 +360,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
       // Hex editor not installed; open as regular file
       await vscode.commands.executeCommand('vscode.open', uri);
       vscode.window.showInformationMessage(
-        `BinSleuth — Jump to offset ${hexStr} in ${path.basename(filePath)}`,
+        vscode.l10n.t('BinSleuth — Jump to offset {0} in {1}', hexStr, path.basename(filePath)),
       );
     }
   }
@@ -268,6 +370,8 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
   private _getHtmlContent(webview: vscode.Webview): string {
     const nonce = getNonce();
     const csp = webview.cspSource;
+    const i18n = buildI18n();
+    const i18nJson = JSON.stringify(i18n);
 
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -630,18 +734,18 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     <span class="logo-text">BINSLEUTH</span>
     <div class="spacer"></div>
     <div id="export-wrapper">
-      <button id="btn-export" class="header-btn" title="Export report">&#x2B07; EXPORT</button>
+      <button id="btn-export" class="header-btn" title="Export report">&#x2B07; ${i18n.btnExport}</button>
       <div id="export-menu">
-        <div class="export-item" data-fmt="md">Markdown (.md)</div>
-        <div class="export-item" data-fmt="json">JSON (.json)</div>
-        <div class="export-item" data-fmt="csv">CSV (.csv)</div>
+        <div class="export-item" data-fmt="md">${i18n.exportMd}</div>
+        <div class="export-item" data-fmt="json">${i18n.exportJson}</div>
+        <div class="export-item" data-fmt="csv">${i18n.exportCsv}</div>
       </div>
     </div>
-    <button id="btn-open" class="header-btn" title="Open file in editor">&#x25B6; OPEN</button>
+    <button id="btn-open" class="header-btn" title="Open file in editor">&#x25B6; ${i18n.btnOpen}</button>
   </div>
-  <div id="filename">— NO FILE LOADED —</div>
+  <div id="filename">${i18n.noFileLoaded}</div>
   <div id="score-row">
-    <span id="score-label">SCORE</span>
+    <span id="score-label">${i18n.score}</span>
     <div id="score-bar-bg"><div id="score-bar"></div></div>
     <span id="score-val" style="color:var(--dim)">--</span>
   </div>
@@ -650,11 +754,11 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
 <!-- ── Empty / error states ────────────────────────────────────────────────── -->
 <div id="empty-state">
   <div class="empty-icon">⬡</div>
-  <div class="empty-title">AWAITING TARGET</div>
+  <div class="empty-title">${i18n.awaitingTarget}</div>
   <div class="empty-hint">
-    Open an ELF / PE / binary file,<br>
-    or right-click a file and choose<br>
-    <strong style="color:var(--cyan)">BinSleuth: Analyze Binary</strong>
+    ${i18n.emptyHintLine1}<br>
+    ${i18n.emptyHintLine2}<br>
+    <strong style="color:var(--cyan)">${i18n.analyzeCmd}</strong>
   </div>
 </div>
 
@@ -665,27 +769,27 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
 
   <!-- Security flags -->
   <div class="panel" id="security-panel">
-    <div class="panel-title">Security Flags</div>
+    <div class="panel-title">${i18n.panelSecurity}</div>
     <div id="security-flags"></div>
   </div>
 
   <!-- Binary info -->
   <div class="panel">
-    <div class="panel-title">Binary Info</div>
+    <div class="panel-title">${i18n.panelInfo}</div>
     <div id="binary-info"></div>
   </div>
 
   <!-- Dangerous symbols (shown only if any exist) -->
   <div class="panel" id="dangerous-symbols-section">
     <div class="panel-title" style="color:var(--orange);text-shadow:0 0 6px var(--orange);">
-      ⚠ Dangerous Symbols
+      ${i18n.panelDangerous}
     </div>
     <div id="dangerous-list"></div>
   </div>
 
   <!-- Section Map (Sunburst / Doughnut) -->
   <div class="panel">
-    <div class="panel-title">Section Map</div>
+    <div class="panel-title">${i18n.panelSectionMap}</div>
     <div class="chart-wrap">
       <canvas id="sectionChart"></canvas>
     </div>
@@ -696,14 +800,14 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
   <!-- Section Heatmap (size = bar length, entropy = bar color) -->
   <div class="panel" style="border-bottom:none;">
     <div class="panel-title" style="display:flex;align-items:center;gap:6px;">
-      Section Heatmap
+      ${i18n.panelHeatmap}
       <select id="combined-sort" title="Sort order">
-        <option value="offset">OFFSET ↑</option>
-        <option value="size_desc">SIZE ↓</option>
-        <option value="size_asc">SIZE ↑</option>
-        <option value="entropy_desc">ENTROPY ↓</option>
-        <option value="entropy_asc">ENTROPY ↑</option>
-        <option value="name">NAME A-Z</option>
+        <option value="offset">${i18n.sortOffset}</option>
+        <option value="size_desc">${i18n.sortSizeDesc}</option>
+        <option value="size_asc">${i18n.sortSizeAsc}</option>
+        <option value="entropy_desc">${i18n.sortEntropyDesc}</option>
+        <option value="entropy_asc">${i18n.sortEntropyAsc}</option>
+        <option value="name">${i18n.sortName}</option>
       </select>
     </div>
     <div class="chart-wrap">
@@ -722,6 +826,9 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
 <script nonce="${nonce}">
 (function () {
   'use strict';
+
+  // ── i18n (injected from TypeScript via vscode.l10n) ───────────────────────
+  const i18n = ${i18nJson};
 
   // ── VS Code API ────────────────────────────────────────────────────────────
   const vscode = acquireVsCodeApi();
@@ -885,9 +992,9 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
               label: (item) => {
                 const sec = sorted[item.dataIndex];
                 return [
-                  \`  Size    \${fmtBytes(sec.size)}\`,
-                  \`  Offset  \${fmtHex(sec.file_offset)}\`,
-                  \`  Entropy \${sec.entropy.toFixed(3)} bits\`,
+                  \`  \${i18n.ttSize}    \${fmtBytes(sec.size)}\`,
+                  \`  \${i18n.ttOffset}  \${fmtHex(sec.file_offset)}\`,
+                  \`  \${i18n.ttEntropy} \${sec.entropy.toFixed(3)} bits\`,
                   \`  \${sec.permissions.execute ? 'X' : '-'}\${sec.permissions.write ? 'W' : '-'}\${sec.permissions.read ? 'R' : '-'}\`,
                 ];
               },
@@ -929,7 +1036,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
           ctx.font = '9px "Courier New", monospace';
           ctx.fillStyle = '#6888a8';
           ctx.shadowBlur = 0;
-          ctx.fillText(\`\${currentData.sections.length} SECTIONS\`, cx, cy + 7);
+          ctx.fillText(currentData.sections.length + ' ' + i18n.sections, cx, cy + 7);
           ctx.restore();
         },
       }],
@@ -962,12 +1069,12 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     el.style.display = 'block';
     el.style.borderLeftColor = color;
     el.innerHTML = \`
-      <div class="detail-row"><span class="detail-key">NAME</span><span class="detail-val" style="color:\${color}">\${sec.name}</span></div>
-      <div class="detail-row"><span class="detail-key">SIZE</span><span class="detail-val">\${fmtBytes(sec.size)}</span></div>
-      <div class="detail-row"><span class="detail-key">OFFSET</span><span class="detail-val">\${fmtHex(sec.file_offset)}</span></div>
-      <div class="detail-row"><span class="detail-key">VADDR</span><span class="detail-val">\${fmtHex(sec.virtual_address)}</span></div>
-      <div class="detail-row"><span class="detail-key">ENTROPY</span><span class="detail-val" style="color:\${entropyToColor(sec.entropy)}">\${sec.entropy.toFixed(3)} bits</span></div>
-      <div class="detail-row"><span class="detail-key">PERMS</span><span class="detail-val">\${perms}</span></div>
+      <div class="detail-row"><span class="detail-key">\${i18n.keyName}</span><span class="detail-val" style="color:\${color}">\${sec.name}</span></div>
+      <div class="detail-row"><span class="detail-key">\${i18n.keySize}</span><span class="detail-val">\${fmtBytes(sec.size)}</span></div>
+      <div class="detail-row"><span class="detail-key">\${i18n.keyOffset}</span><span class="detail-val">\${fmtHex(sec.file_offset)}</span></div>
+      <div class="detail-row"><span class="detail-key">\${i18n.keyVaddr}</span><span class="detail-val">\${fmtHex(sec.virtual_address)}</span></div>
+      <div class="detail-row"><span class="detail-key">\${i18n.keyEntropy}</span><span class="detail-val" style="color:\${entropyToColor(sec.entropy)}">\${sec.entropy.toFixed(3)} bits</span></div>
+      <div class="detail-row"><span class="detail-key">\${i18n.keyPerms}</span><span class="detail-val">\${perms}</span></div>
     \`;
   }
 
@@ -1048,7 +1155,7 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
         c.font = '7px Courier New';
         c.textAlign = 'right';
         c.textBaseline = 'top';
-        c.fillText('entropy (bits)', right, stripY + stripH + 12);
+        c.fillText(i18n.entropyBits, right, stripY + stripH + 12);
         c.restore();
       },
     };
@@ -1160,11 +1267,11 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
                 const sec = sorted[item.dataIndex];
                 const pct = ((sec.size / maxSize) * 100).toFixed(1);
                 const e   = sec.entropy;
-                const risk = e > 7 ? ' ⚠ PACKED/ENCRYPTED' : e > 5.5 ? ' HIGH' : e > 3 ? ' NORMAL' : ' LOW';
+                const risk = e > 7 ? ' ' + i18n.riskPacked : e > 5.5 ? ' ' + i18n.riskHigh : e > 3 ? ' ' + i18n.riskNormal : ' ' + i18n.riskLow;
                 return [
-                  \`  Size     \${fmtBytes(sec.size)} (\${pct}%)\`,
-                  \`  Entropy  \${e.toFixed(3)} bits\${risk}\`,
-                  \`  Offset   \${fmtHex(sec.file_offset)}\`,
+                  \`  \${i18n.ttSize}     \${fmtBytes(sec.size)} (\${pct}%)\`,
+                  \`  \${i18n.ttEntropy}  \${e.toFixed(3)} bits\${risk}\`,
+                  \`  \${i18n.ttOffset}   \${fmtHex(sec.file_offset)}\`,
                 ];
               },
             },
@@ -1211,10 +1318,10 @@ export class BinsleuthViewProvider implements vscode.WebviewViewProvider {
     const el = document.getElementById('binary-info');
     const name = data.file.replace(/\\\\/g, '/').split('/').pop();
     el.innerHTML = \`
-      <div class="info-item"><span class="info-key">FORMAT</span><span class="info-val">\${data.security.format}</span></div>
-      <div class="info-item"><span class="info-key">ARCH</span><span class="info-val">\${data.security.architecture}</span></div>
-      <div class="info-item"><span class="info-key">FILE SIZE</span><span class="info-val">\${fmtBytes(data.total_file_size)}</span></div>
-      <div class="info-item"><span class="info-key">SECTIONS</span><span class="info-val">\${data.sections.length}</span></div>
+      <div class="info-item"><span class="info-key">\${i18n.keyFormat}</span><span class="info-val">\${data.security.format}</span></div>
+      <div class="info-item"><span class="info-key">\${i18n.keyArch}</span><span class="info-val">\${data.security.architecture}</span></div>
+      <div class="info-item"><span class="info-key">\${i18n.keyFileSize}</span><span class="info-val">\${fmtBytes(data.total_file_size)}</span></div>
+      <div class="info-item"><span class="info-key">\${i18n.keySections}</span><span class="info-val">\${data.sections.length}</span></div>
     \`;
   }
 
@@ -1426,7 +1533,7 @@ _Generated by [BinSleuth](https://github.com/long-910/vscode-binsleuth)_
           const dot = document.getElementById('status-dot');
           dot.classList.add('analyzing');
           document.getElementById('filename').textContent =
-            \`ANALYZING: \${msg.filename}\`;
+            i18n.analyzing + ': ' + msg.filename;
         }
         break;
 

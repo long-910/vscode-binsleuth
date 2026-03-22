@@ -1,0 +1,6 @@
+{
+  "ext.description": "Binary analysis visualizer — section map, entropy heatmap, security flags",
+  "cmd.analyzeFile": "BinSleuth: Analyze Binary",
+  "cmd.analyzeActiveFile": "BinSleuth: Analyze Active File",
+  "view.analysis": "Analysis"
+}

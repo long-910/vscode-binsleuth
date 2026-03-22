@@ -95,7 +95,7 @@ export function activate(context: vscode.ExtensionContext): void {
       async (uri?: vscode.Uri) => {
         const target = uri ?? getActiveUri();
         if (!target) {
-          vscode.window.showErrorMessage('BinSleuth: No file selected.');
+          vscode.window.showErrorMessage(vscode.l10n.t('BinSleuth: No file selected.'));
           return;
         }
         await provider.analyzeFile(toLocalPath(target));
@@ -110,7 +110,7 @@ export function activate(context: vscode.ExtensionContext): void {
       async () => {
         const uri = getActiveUri();
         if (!uri) {
-          vscode.window.showErrorMessage('BinSleuth: No active file.');
+          vscode.window.showErrorMessage(vscode.l10n.t('BinSleuth: No active file.'));
           return;
         }
         await provider.analyzeFile(toLocalPath(uri));

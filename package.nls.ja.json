@@ -1,0 +1,6 @@
+{
+  "ext.description": "バイナリ解析ビジュアライザー — セクションマップ・エントロピーヒートマップ・セキュリティフラグ",
+  "cmd.analyzeFile": "BinSleuth: バイナリを解析",
+  "cmd.analyzeActiveFile": "BinSleuth: アクティブファイルを解析",
+  "view.analysis": "解析"
+}

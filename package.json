@@ -1,7 +1,7 @@
 {
   "name": "vscode-binsleuth",
   "displayName": "BinSleuth",
-  "description": "Binary analysis visualizer — section map, entropy heatmap, security flags",
+  "description": "%ext.description%",
   "version": "0.1.0",
   "publisher": "long-kudo",
   "engines": {
@@ -30,6 +30,7 @@
     "url": "https://github.com/long-910/vscode-binsleuth/issues"
   },
   "license": "MIT",
+  "l10n": "./l10n",
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
@@ -47,7 +48,7 @@
         {
           "type": "webview",
           "id": "binsleuth.analysisView",
-          "name": "Analysis",
+          "name": "%view.analysis%",
           "icon": "resources/icon.svg"
         }
       ]
@@ -55,12 +56,12 @@
     "commands": [
       {
         "command": "binsleuth.analyzeFile",
-        "title": "BinSleuth: Analyze Binary",
+        "title": "%cmd.analyzeFile%",
         "icon": "$(eye)"
       },
       {
         "command": "binsleuth.analyzeActiveFile",
-        "title": "BinSleuth: Analyze Active File"
+        "title": "%cmd.analyzeActiveFile%"
       }
     ],
     "menus": {
@@ -85,7 +86,10 @@
     "watch": "tsc -watch -p ./",
     "build:rust": "cd src-rust && cargo build --release",
     "build:rust:debug": "cd src-rust && cargo build",
-    "build": "npm run build:rust && npm run compile"
+    "build": "npm run build:rust && npm run compile",
+    "stage-bin": "mkdir -p bin && cp src-rust/target/release/binsleuth-bridge bin/",
+    "package:vsix": "npm run build && npm run stage-bin && vsce package",
+    "package:vsix-win": "npm run package:vsix && bash -c 'DEST=$(wslpath -u \"$(cmd.exe /c \"echo %USERPROFILE%\" 2>/dev/null | tr -d \"\\r\")/Downloads\") && cp -v *.vsix \"$DEST/\" && echo \"Installed to $DEST\"'"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

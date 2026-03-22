@@ -15,3 +15,6 @@ docs/**
 .claude/**
 .github/**
 *.vsix
+package-lock.json
+README.ja.md
+README.zh.md

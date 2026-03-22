@@ -115,13 +115,28 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Marketplace publish — uncomment when ready
-      # - name: Publish to VS Marketplace
-      #   uses: HaaLeo/publish-vscode-extension@v2
-      #   strategy:
-      #     matrix:
-      #       vsce_target: [linux-x64, darwin-arm64, darwin-x64, win32-x64]
-      #   with:
-      #     pat: ${{ secrets.VSCE_PAT }}
-      #     registryUrl: https://marketplace.visualstudio.com
-      #     packagePath: vsix-artifacts/vscode-binsleuth-*-${{ matrix.vsce_target }}.vsix
+
+  # ── VS Marketplace publish ───────────────────────────────────────────────────
+  # 有効化するには GitHub リポジトリの Settings → Secrets に VSCE_PAT を登録する。
+  # プレリリース（タグに "-" を含む）は Marketplace に公開しない。
+  publish:
+    name: Publish to VS Marketplace
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, '-') && vars.MARKETPLACE_PUBLISH == 'true' }}
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: vsix-artifacts
+          pattern: vsix-*
+          merge-multiple: true
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Publish all platform VSIXs
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          vsce publish --packagePath vsix-artifacts/*.vsix --pat "$VSCE_PAT"

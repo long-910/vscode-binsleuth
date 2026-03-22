@@ -1,6 +1,8 @@
 # vscode-binsleuth
 
-> Cyberpunk binary analysis — section map, section heatmap, and security flags right inside VS Code.
+>  binary analysis — section map, section heatmap, and security flags right inside VS Code.
+
+![vscode-binsleuth](https://repository-images.githubusercontent.com/1188141623/48b0a80f-364a-4652-98f3-bdbbc541c4ad)
 
 <div align="center">
 
@@ -10,6 +12,10 @@
 [![binsleuth](https://img.shields.io/crates/v/binsleuth?style=flat-square&label=binsleuth&logo=rust)](https://crates.io/crates/binsleuth)
 [![CI](https://github.com/long-910/vscode-binsleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-binsleuth/actions/workflows/ci.yml)
 [![Release](https://github.com/long-910/vscode-binsleuth/actions/workflows/release.yml/badge.svg)](https://github.com/long-910/vscode-binsleuth/actions/workflows/release.yml)
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-pink?logo=github)](https://github.com/sponsors/long-910)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/long910)
+
+🌐 [English](README.md) | [日本語](README.ja.md) | [中文](README.zh.md)
 
 </div>
 
@@ -162,21 +168,18 @@ The bridge binary is a Linux ELF (`bin/binsleuth-bridge`) invoked directly.
 
 ### VS Code running on Windows (native)
 
-The extension detects `process.platform === 'win32'` and calls the bridge via `wsl.exe`:
+When the `win32-x64` VSIX (from GitHub Releases) is installed, the extension runs the native `binsleuth-bridge.exe` directly — **no WSL required**.
+
+When built from source in WSL, the extension falls back to calling the Linux bridge via `wsl.exe`:
 
 ```
 wsl.exe <wsl-path-to-bridge> <wsl-path-to-file>
 ```
 
-File paths are converted automatically:
-
-| Input path | Converted to |
-|-----------|--------------|
-| `C:\Users\foo\bar.exe` | `/mnt/c/Users/foo/bar.exe` |
-| `//wsl.localhost/Ubuntu/home/foo/a.out` | `/home/foo/a.out` |
-| `/Ubuntu/home/foo/a.out` | `/home/foo/a.out` |
-
-**Requirement:** WSL must be installed and `wsl.exe` must be on `%PATH%`.
+| Scenario | Binary used | WSL required? |
+|----------|-------------|:---:|
+| Installed from `win32-x64` VSIX | `binsleuth-bridge.exe` (native) | No |
+| Built locally from WSL, tested in Windows VS Code | `binsleuth-bridge` (Linux ELF via `wsl.exe`) | Yes |
 
 ---
 
