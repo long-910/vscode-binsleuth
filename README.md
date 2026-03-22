@@ -21,12 +21,6 @@
 
 ---
 
-## Screenshot
-
-![BinSleuth demo](images/demo.png)
-
----
-
 ## What It Shows
 
 ```
