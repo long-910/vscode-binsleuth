@@ -2,7 +2,7 @@
   "name": "vscode-binsleuth",
   "displayName": "BinSleuth",
   "description": "%ext.description%",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "long-kudo",
   "engines": {
     "vscode": "^1.85.0"

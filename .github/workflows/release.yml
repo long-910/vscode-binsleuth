@@ -53,10 +53,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 20
-          cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Compile TypeScript
         run: npm run compile
@@ -141,3 +140,31 @@ jobs:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
           vsce publish --packagePath vsix-artifacts/*.vsix --pat "$VSCE_PAT"
+
+
+  # ── Open VSX Registry publish ────────────────────────────────────────────────
+  # 有効化するには GitHub リポジトリの Settings → Secrets に OVSX_PAT を登録する。
+  # プレリリース（タグに "-" を含む）は Open VSX に公開しない。
+  publish-ovsx:
+    name: Publish to Open VSX
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref_name, '-') && secrets.OVSX_PAT != '' }}
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: vsix-artifacts
+          pattern: vsix-*
+          merge-multiple: true
+
+      - name: Install ovsx
+        run: npm install -g ovsx
+
+      - name: Publish all platform VSIXs
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          for vsix in vsix-artifacts/*.vsix; do
+            ovsx publish "$vsix" --pat "$OVSX_PAT"
+          done
