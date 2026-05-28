@@ -211,6 +211,7 @@ VSCodium・Gitpod・Eclipse Theia などの Open VSX Registry を使用するエ
 | 多言語対応（日本語・中国語） | ✅ v0.1.0 |
 | VS Code Marketplace への公開 | ✅ v0.1.0 |
 | Open VSX Registry への公開 | ✅ v0.2.0 |
+| CI 修正: Open VSX 公開ワークフロー | ✅ v0.2.1 |
 | ブリッジバイナリパスの設定 | 🔲 予定 |
 | PE / Mach-O 形式バッジ | 🔲 予定 |
 | 差分ビュー（2つのバイナリの比較） | 🔲 予定 |

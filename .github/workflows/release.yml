@@ -149,7 +149,7 @@ jobs:
     name: Publish to Open VSX
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref_name, '-') && secrets.OVSX_PAT != '' }}
+    if: ${{ !contains(github.ref_name, '-') && vars.OVSX_PUBLISH != 'false' }}
 
     steps:
       - uses: actions/download-artifact@v8
