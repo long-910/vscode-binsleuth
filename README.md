@@ -211,6 +211,7 @@ Install: **Extensions (Ctrl+Shift+X)** → **⋯** → **Install from VSIX…**
 | i18n — Japanese & Simplified Chinese | ✅ v0.1.0 |
 | VS Code Marketplace publication | ✅ v0.1.0 |
 | Open VSX Registry publication | ✅ v0.2.0 |
+| CI fix: Open VSX publish workflow | ✅ v0.2.1 |
 | Configurable bridge binary path | 🔲 planned |
 | PE / Mach-O format badges | 🔲 planned |
 | Diff view (compare two binaries) | 🔲 planned |

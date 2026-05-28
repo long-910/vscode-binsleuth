@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] - 2026-05-28
+
+### Fixed
+
+- CI: replace `secrets.OVSX_PAT != ''` with `vars.OVSX_PUBLISH != 'false'` in `publish-ovsx` job condition — secrets context is not available in job-level `if` expressions, causing the workflow to fail with a "workflow file issue" error
+
 ## [0.2.0] - 2026-05-28
 
 ### Added
