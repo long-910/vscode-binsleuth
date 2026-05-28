@@ -12,6 +12,7 @@
 [![binsleuth](https://img.shields.io/crates/v/binsleuth?style=flat-square&label=binsleuth&logo=rust)](https://crates.io/crates/binsleuth)
 [![CI](https://github.com/long-910/vscode-binsleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/long-910/vscode-binsleuth/actions/workflows/ci.yml)
 [![Release](https://github.com/long-910/vscode-binsleuth/actions/workflows/release.yml/badge.svg)](https://github.com/long-910/vscode-binsleuth/actions/workflows/release.yml)
+[![Open VSX](https://img.shields.io/open-vsx/v/long-910/vscode-binsleuth?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/long-910/vscode-binsleuth)
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-pink?logo=github)](https://github.com/sponsors/long-910)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/long910)
 
@@ -159,6 +160,16 @@ The report includes: binary metadata, per-section table (name · size · offset 
 
 Or install directly from the [VS Code Marketplace page](https://marketplace.visualstudio.com/items?itemName=long-910.vscode-binsleuth).
 
+### Open VSX Registry (VSCodium / Gitpod)
+
+For editors that use the Open VSX Registry (VSCodium, Gitpod, Eclipse Theia, etc.):
+
+1. Open the Extensions view in your editor.
+2. Search for **BinSleuth**.
+3. Click **Install**.
+
+Or install directly from the [Open VSX page](https://open-vsx.org/extension/long-910/vscode-binsleuth).
+
 ### From GitHub Releases
 
 If you need a specific platform build, download the VSIX from the [Releases page](https://github.com/long-910/vscode-binsleuth/releases):
@@ -199,6 +210,7 @@ Install: **Extensions (Ctrl+Shift+X)** → **⋯** → **Install from VSIX…**
 | Multi-OS support (Windows native, macOS, Linux) | ✅ v0.1.0 |
 | i18n — Japanese & Simplified Chinese | ✅ v0.1.0 |
 | VS Code Marketplace publication | ✅ v0.1.0 |
+| Open VSX Registry publication | ✅ v0.2.0 |
 | Configurable bridge binary path | 🔲 planned |
 | PE / Mach-O format badges | 🔲 planned |
 | Diff view (compare two binaries) | 🔲 planned |
